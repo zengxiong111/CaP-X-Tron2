@@ -1,8 +1,71 @@
 # CaP-X-Tron2
 
-### CaP-X coding agents for TRON2 tabletop manipulation
+CaP-X-Tron2 将 [CaP-X](https://github.com/capgym/cap-x) 的代码执行框架用于 LimX TRON2 的桌面操作，目前在 MuJoCo 中验证从任务指令到机器人动作的流程。Agent 生成 Python，通过统一工具读取状态、定位物体、移动末端和控制夹爪。执行失败时，CaP-X 会把失败原因和当前状态送回下一回合，让 Agent 重新观察并尝试。
 
-**CaP-X-Tron2** adds Cube Lift and Pick & Place for the LimX DACH_TRON2A model in MuJoCo. Run the same CaP-X tools against a mock backend, simulator poses (S1), or RGB-D position estimates (S2). The [TRON2 bring-up guide](docs/tron2_bringup.md) covers setup, evaluation results and the path to hardware.
+当前使用官方 **DACH_TRON2A** 模型和双指夹爪，验证两项单臂桌面任务。
+
+- **Cube Lift**：夹起方块，让方块中心升高至少 7 cm，并稳定握持至少 0.25 秒。
+- **Pick & Place**：夹取并移动方块，释放后让方块在目标区稳定至少 0.25 秒。
+
+[实施与验收指南](docs/tron2_bringup.md) · [任务配置](env_configs/tron2/) · [回归测试](tests/tron2/)
+
+## 当前进展
+
+同一份手写参考程序（Oracle）通过 CaP-X CLI 运行。每个配置和任务组合都使用种子 1–20。
+
+| 配置 | 物体位置来源 | Cube Lift | Pick & Place |
+| --- | --- | ---: | ---: |
+| Mock | 内存中的模拟状态，验证工具与任务流程 | 20/20 | 20/20 |
+| MuJoCo S1 | 仿真真值位姿，验证指尖接触、夹持和释放 | 20/20 | 20/20 |
+| MuJoCo S2 | RGB-D 估计红色方块和绿色目标的中心，验证视觉定位后的抓放 | 20/20 | 20/20 |
+
+7 项 TRON2 回归测试通过。测试中，模拟模型先在空处闭爪，下一回合收到 `empty_grasp` 和新的观测，再在同一场景完成抬升。表中的完成数是 **Oracle 仿真基线**，实际语言模型和真机尚未评测。[验收环境与复现步骤](docs/tron2_bringup.md#5-验收记录)
+
+## 仓库结构
+
+```text
+capx/
+├── envs/
+│   ├── simulators/tron2_mujoco.py  # 环境、回合状态和任务判据
+│   └── tasks/tron2/              # 任务提示、Oracle 和失败反馈
+├── integrations/tron2/           # 统一工具、Mock、MuJoCo、RGB-D 和指令检查
+└── third_party/                  # 上游 CaP-X 依赖子模块
+env_configs/tron2/                # 两项任务的 Mock、S1、S2 配置
+tests/tron2/                      # 工具调用、重试和仿真回归
+docs/tron2_bringup.md              # 安装、模型资产下载、评测和真机接入说明
+requirements-tron2.txt            # TRON2 仿真评测依赖
+```
+
+## 快速开始
+
+在仓库根目录用 Python 3.10–3.12 创建环境。先跑一次离线 Mock，确认任务配置和工具调用可用。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-tron2.txt
+python -m capx.envs.launch \
+  --config-path env_configs/tron2/cube_lift_mock.yaml \
+  --use-oracle-code True --total-trials 1
+```
+
+运行 S1 或 S2 前，按实施指南获取固定版本的官方模型，并设置 `TRON2_MJCF_PATH`。S2 还需要可用的 MuJoCo 渲染环境。[模型下载和仿真命令](docs/tron2_bringup.md#2-用官方-dach_tron2a-模型评测)
+
+## 未完成
+
+| 工作 | 下一步 |
+| --- | --- |
+| 实际模型评测 | 接通实际语言模型端点，测量生成代码的任务完成率、重试次数和主要失败原因。 |
+| S2 视觉泛化 | 当前使用固定场景中的颜色和尺寸先验。还需验证光照、遮挡和未标记物体，并加入完整 6D 位姿估计。 |
+| 真机接入与联调 | 接入 `tron2_env`，完成末端工具和相机标定、限速、急停及失联测试，先在人工监督下验证 Oracle。 |
+| 连续录像 | 目前可读取 RGB-D 快照，还需为每回合接入连续录像及其时间戳。 |
+
+## 上游 CaP-X
+
+本项目沿用上游 CaP-X 的代码执行和评测框架。以下是上游环境的安装、运行和扩展入口。
+
+<details>
+<summary>展开上游 CaP-X 说明</summary>
 
 [Project Page](https://capgym.github.io/) &ensp;|&ensp; [Paper](https://arxiv.org/abs/2603.22435) 
 
@@ -196,7 +259,7 @@ uv run --no-sync --active capx/envs/launch.py \
 | [RL Training](docs/rl-training.md) | CaP-RL with GRPO/VeRL, sim-to-real transfer |
 | [Skill Library Compilation](scripts/skill_library_compilation/README.md) | Analyze eval outputs, compile reusable skill libraries |
 
----
+</details>
 
 ## Citation
 
