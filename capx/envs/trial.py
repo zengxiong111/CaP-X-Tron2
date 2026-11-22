@@ -800,8 +800,8 @@ def _run_single_trial(
 
         obs = obs_next
 
-        # Multi-turn decision
-        if multi_turn_prompt:
+        # Oracle trials are offline. A terminal step cannot request another action.
+        if multi_turn_prompt and not config["use_oracle_code"] and not (terminated or truncated):
             if "terminated episode" in info_step["stderr"]:
                 truncated = True
                 break
@@ -863,6 +863,10 @@ def _run_single_trial(
                     partial_artifacts["num_finishes"] = num_finishes
                 break
 
+        if terminated or truncated:
+            del code_blocks[code_block_idx:]
+            del code_block_metadata[code_block_idx:]
+
         print(f"Code block {code_block_idx} done")
         print(f"Number of code blocks: {len(code_blocks)}")
 
@@ -883,6 +887,9 @@ def _run_single_trial(
                 suffix_extra=str(len(code_blocks)),
             )
 
+        if terminated or truncated:
+            break
+
     print("Code blocks done")
 
     # --- 5. Build final summary ---
@@ -899,7 +906,10 @@ def _run_single_trial(
     if sandbox_rc_override is not None:
         info_step["sandbox_rc"] = sandbox_rc_override
 
-    stderr = "\n\n".join(stderr_history) if stderr_history else info_step["stderr"]
+    last_stderr = info_step["stderr"]
+    if last_stderr and (not stderr_history or stderr_history[-1] != last_stderr):
+        stderr_history.append(last_stderr)
+    stderr = "\n\n".join(stderr_history)
     log_lines = _build_log_lines(
         final_code, info_step, reward, terminated, truncated,
         num_regenerations, num_finishes, num_code_blocks,

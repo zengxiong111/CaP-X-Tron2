@@ -15,6 +15,25 @@ from .franka.franka_pick_place import FrankaPickPlaceCodeEnv
 from .franka.franka_spill_wipe import FrankaSpillWipeCodeEnv
 from .franka.two_arm_handover import TwoArmHandoverCodeEnv
 from .franka.two_arm_lift import TwoArmLiftCodeEnv
+from .tron2.cube_lift import Tron2CubeLiftCodeEnv
+from .tron2.pick_place import Tron2PickPlaceCodeEnv
+
+for _name, _task, _simulator in (
+    ("tron2_cube_lift_code_env", Tron2CubeLiftCodeEnv, "tron2_mujoco"),
+    ("tron2_pick_place_code_env", Tron2PickPlaceCodeEnv, "tron2_mujoco_pick_place"),
+    ("tron2_mock_cube_lift_code_env", Tron2CubeLiftCodeEnv, "tron2_mock"),
+    ("tron2_mock_pick_place_code_env", Tron2PickPlaceCodeEnv, "tron2_mock_pick_place"),
+):
+    register_exec_env(_name, _task)
+    register_config(
+        _name,
+        CodeExecEnvConfig(
+            low_level=_simulator,
+            privileged=True,
+            enable_render=False,
+            apis=["Tron2ControlApi"],
+        ),
+    )
 
 register_exec_env("franka_real_code_env", FrankaPickPlaceCodeEnv)
 register_config(

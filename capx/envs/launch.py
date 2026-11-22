@@ -18,6 +18,7 @@ Execution flow::
 from __future__ import annotations
 
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,7 +28,8 @@ import tyro
 
 from capx.utils.launch_utils import _load_config
 
-os.environ.setdefault("MUJOCO_GL", "egl")
+if sys.platform == "linux":
+    os.environ.setdefault("MUJOCO_GL", "egl")
 
 
 # ---------------------------------------------------------------------------

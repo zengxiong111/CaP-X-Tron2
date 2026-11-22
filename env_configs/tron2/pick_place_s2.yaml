@@ -1,0 +1,28 @@
+# Estimate the cube and target positions from RGB-D in the DACH_TRON2A scene.
+env:
+  _target_: capx.envs.tasks.tron2.pick_place.Tron2PickPlaceCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: pick_place
+      backend: mujoco
+      privileged: false
+      enable_render: true
+      visual_pose: true
+    apis: [Tron2ControlApi]
+    multi_turn_prompt: |
+      Executed code:
+      {executed_code}
+      Console output and TRON2 episode feedback:
+      {console_stdout}
+      Execution errors:
+      {console_stderr}
+      Re-observe the cube and target through get_object_pose before retrying. A pose estimate can fail if the cube is occluded.
+
+use_visual_feedback: true
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/pick_place_s2
+trials: 20
+num_workers: 1

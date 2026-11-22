@@ -1,0 +1,26 @@
+# Deterministic mock for exercising CaP-X without MuJoCo.
+env:
+  _target_: capx.envs.tasks.tron2.pick_place.Tron2PickPlaceCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: pick_place
+      backend: mock
+      privileged: true
+      enable_render: false
+    apis: [Tron2ControlApi]
+    multi_turn_prompt: |
+      Executed code:
+      {executed_code}
+      Console output and TRON2 episode feedback:
+      {console_stdout}
+      Execution errors:
+      {console_stderr}
+      If the task is incomplete, use the current poses and failure reason to plan a new attempt.
+
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/pick_place_mock
+trials: 20
+num_workers: 1

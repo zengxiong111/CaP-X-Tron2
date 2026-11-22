@@ -1,9 +1,26 @@
 # import all environments here to register them!
+from functools import partial
+
 from capx.envs.base import list_envs, register_env
 
+from .tron2_mujoco import Tron2MujocoEnv
 
-from .franka_real import FrankaRealLowLevel
-register_env("franka_real_low_level", FrankaRealLowLevel)
+TRON2_ENV_FACTORIES = {
+    "tron2_mujoco": Tron2MujocoEnv,
+    "tron2_mujoco_pick_place": partial(Tron2MujocoEnv, task="pick_place"),
+    "tron2_mock": partial(Tron2MujocoEnv, backend="mock"),
+    "tron2_mock_pick_place": partial(Tron2MujocoEnv, backend="mock", task="pick_place"),
+}
+for _name, _factory in TRON2_ENV_FACTORIES.items():
+    register_env(_name, _factory)
+
+try:
+    from .franka_real import FrankaRealLowLevel
+except ModuleNotFoundError as exc:
+    if not exc.name or exc.name.startswith("capx"):
+        raise
+else:
+    register_env("franka_real_low_level", FrankaRealLowLevel)
 
 # NOTE: Can only have one of Robosuite or LIBERO installed at a time!
 # Using Robosuite run: uv sync --extra robosuite
@@ -28,6 +45,8 @@ try:
 
     register_env("two_arm_handover_robosuite", RobosuiteHandoverEnv)
     register_env("two_arm_lift_robosuite", RobosuiteTwoArmLiftEnv)
+except ModuleNotFoundError:
+    print("Robosuite not installed!")
 except Exception:
     import traceback
     print("Robosuite not installed!")

@@ -1,9 +1,8 @@
+# CaP-X-Tron2
 
+### CaP-X coding agents for TRON2 tabletop manipulation
 
-
-# CaP-X
-
-### A Framework for Benchmarking and Improving Coding Agents for Robot Manipulation
+**CaP-X-Tron2** adds Cube Lift and Pick & Place for the LimX DACH_TRON2A model in MuJoCo. Run the same CaP-X tools against a mock backend, simulator poses (S1), or RGB-D position estimates (S2). The [TRON2 bring-up guide](docs/tron2_bringup.md) covers setup, evaluation results and the path to hardware.
 
 [Project Page](https://capgym.github.io/) &ensp;|&ensp; [Paper](https://arxiv.org/abs/2603.22435) 
 
@@ -31,7 +30,7 @@ Shankar Sastry<sup>2</sup>, Yuke Zhu<sup>1</sup>, Ken Goldberg<sup>&dagger;,2</s
 
 ---
 
-## Installation
+## Upstream CaP-X installation
 
 CaP-X uses [uv](https://docs.astral.sh/uv/) for dependency management. Requires **Python 3.10** and a **CUDA-capable GPU**.
 

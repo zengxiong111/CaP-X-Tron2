@@ -33,6 +33,7 @@ outputs/
 output_debug/
 outputs**
 curobo_debug/
+MUJOCO_LOG.TXT
 =*
 core.*
 wandb/
