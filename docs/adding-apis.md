@@ -2,6 +2,10 @@
 
 APIs define the tools that LLM-generated code can call. Each API is a set of Python functions with docstrings that become the model's interface documentation.
 
+## TRON2 example
+
+[Tron2ControlApi](../capx/integrations/tron2/control.py) registers six tools shared by Mock and MuJoCo. Motion and gripper commands return `success`, `code`, and `message`, which the task loop can use for retry feedback. For the precise TCP and object pose frames, camera observations, and backend interface, see the [TRON2 tool contract](tron2_architecture.md#工具和坐标约定).
+
 ## Step 1: Implement the API
 
 ```python

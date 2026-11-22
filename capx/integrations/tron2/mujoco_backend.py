@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import os
+from importlib.resources import files
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -26,9 +27,6 @@ _JOINTS = (
     "wrist_pitch",
     "wrist_roll",
 )
-_TABLE_TOP = 0.62
-_CUBE_HALF_SIZE = 0.02
-_GOAL = (0.445, -0.111)
 _SPAWN_MIN = (.343, -.214)
 _SPAWN_MAX = (.385, -.178)
 _IDENTITY = (1.0, 0.0, 0.0, 0.0)
@@ -117,33 +115,13 @@ def _scene(path: Path) -> str:
         raise ValueError("The DACH model must include a head pitch link.")
     ET.SubElement(head, "camera", name="head", pos=".082 -.03 -.01", fovy="55",
                   xyaxes="0 -1 0 .943 0 .333")
-    ET.SubElement(world, "camera", name="overview", pos="1.25 -1.05 1.33", fovy="49",
-                  xyaxes=".71 .7 0 -.3 .3 .905")
 
-    ET.SubElement(
-        world, "geom", name="task_table", type="box",
-        pos=_xml_vector((.43, 0, _TABLE_TOP - .025)), size=".23 .36 .025",
-        rgba=".62 .55 .44 1", friction=".9 .01 .001", margin=".0002",
-    )
-    ET.SubElement(
-        world, "site", name="task_goal", type="cylinder",
-        pos=_xml_vector((*_GOAL, _TABLE_TOP + .0004)),
-        size=".035 .0004", rgba=".15 .7 .3 .5",
-    )
-    for name, xy, color in (
-        ("task_cube", (.36, -.19), ".88 .12 .1 1"),
-        ("task_distractor", (.40, .16), ".12 .25 .85 1"),
-    ):
-        body = ET.SubElement(
-            world, "body", name=name, pos=_xml_vector((*xy, _TABLE_TOP + _CUBE_HALF_SIZE))
-        )
-        ET.SubElement(body, "freejoint", name=name)
-        ET.SubElement(
-            body, "geom", name=name, type="box", mass=".035",
-            size=_xml_vector((_CUBE_HALF_SIZE,) * 3),
-            rgba=color, contype="2", conaffinity="3", condim="4", friction="1.05 .02 .001",
-            margin=".0002", solref=".004 1",
-        )
+    scene = files("capx.envs").joinpath("assets", "tron2_tasks", "tabletop.xml")
+    with scene.open("rb") as asset:
+        tabletop = ET.parse(asset).getroot().find("worldbody")
+    if tabletop is None:
+        raise ValueError("The TRON2 tabletop asset must define a worldbody.")
+    world.extend(tabletop)
 
     return ET.tostring(root, encoding="unicode")
 
@@ -182,7 +160,12 @@ class MujocoBackend:
             raise ValueError("The external DACH base must be fixed and aligned with the world.")
         self._cube_joint = int(model.joint("task_cube").qposadr[0])
         self._cube_dof = int(model.joint("task_cube").dofadr[0])
-        self._cube_geom = model.geom("task_cube").id
+        cube = model.geom("task_cube")
+        table = model.geom("task_table")
+        self._cube_geom = cube.id
+        goal = model.site("task_goal").pos.copy()
+        goal[2] = table.pos[2] + table.size[2] + cube.size[2]
+        self._goal_position = goal - self._base_pos
         self._actor_geoms = {
             geom.id for i in range(model.ngeom) if model.geom_contype[i] != 0
             and (geom := model.geom(i)).name not in {
@@ -296,8 +279,7 @@ class MujocoBackend:
     def get_object_pose(self, name: str) -> Pose:
         self._ensure_open()
         if name == "target":
-            goal = np.asarray((*_GOAL, _TABLE_TOP + _CUBE_HALF_SIZE)) - self._base_pos
-            return tuple(map(float, (*goal, *_IDENTITY)))
+            return tuple(map(float, (*self._goal_position, *_IDENTITY)))
         if name != "cube":
             raise ObservationUnavailableError(f"Unknown object {name!r}. Use 'cube' or 'target'.")
         qpos = self._data.qpos[self._cube_joint:self._cube_joint + 7].copy()

@@ -7,7 +7,7 @@ CaP-X-Tron2 将 [CaP-X](https://github.com/capgym/cap-x) 的代码执行框架�
 - **Cube Lift**：夹起方块，让方块中心升高至少 7 cm，并稳定握持至少 0.25 秒。
 - **Pick & Place**：夹取并移动方块，释放后让方块在目标区稳定至少 0.25 秒。
 
-[实施与验收指南](docs/tron2_bringup.md) · [任务配置](env_configs/tron2/) · [回归测试](tests/tron2/)
+[仿真运行与验收](docs/tron2_bringup.md) · [架构与工具](docs/tron2_architecture.md) · [真机接入路线](docs/tron2_hardware.md)
 
 ## 当前进展
 
@@ -26,13 +26,14 @@ CaP-X-Tron2 将 [CaP-X](https://github.com/capgym/cap-x) 的代码执行框架�
 ```text
 capx/
 ├── envs/
+│   ├── assets/tron2_tasks/        # 自有桌面、方块、目标区和外部相机 MJCF
 │   ├── simulators/tron2_mujoco.py  # 环境、回合状态和任务判据
 │   └── tasks/tron2/              # 任务提示、Oracle 和失败反馈
 ├── integrations/tron2/           # 统一工具、Mock、MuJoCo、RGB-D 和指令检查
 └── third_party/                  # 上游 CaP-X 依赖子模块
 env_configs/tron2/                # 两项任务的 Mock、S1、S2 配置
 tests/tron2/                      # 工具调用、重试和仿真回归
-docs/tron2_bringup.md              # 安装、模型资产下载、评测和真机接入说明
+docs/tron2_*.md                    # 仿真运行、工具契约和真机路线
 requirements-tron2.txt            # TRON2 仿真评测依赖
 ```
 
@@ -49,7 +50,7 @@ python -m capx.envs.launch \
   --use-oracle-code True --total-trials 1
 ```
 
-运行 S1 或 S2 前，按实施指南获取固定版本的官方模型，并设置 `TRON2_MJCF_PATH`。S2 还需要可用的 MuJoCo 渲染环境。[模型下载和仿真命令](docs/tron2_bringup.md#2-用官方-dach_tron2a-模型评测)
+运行 S1 或 S2 前，获取固定版本的官方模型并设置 `TRON2_MJCF_PATH`。机器人模型与网格保存在外部目录，项目自有场景随仓库分发。S2 还需要可用的 MuJoCo 渲染环境。[模型下载和仿真命令](docs/tron2_bringup.md#2-用官方-dach_tron2a-模型评测)
 
 ## 未完成
 
@@ -57,7 +58,7 @@ python -m capx.envs.launch \
 | --- | --- |
 | 实际模型评测 | 接通实际语言模型端点，测量生成代码的任务完成率、重试次数和主要失败原因。 |
 | S2 视觉泛化 | 当前使用固定场景中的颜色和尺寸先验。还需验证光照、遮挡和未标记物体，并加入完整 6D 位姿估计。 |
-| 真机接入与联调 | 接入 `tron2_env`，完成末端工具和相机标定、限速、急停及失联测试，先在人工监督下验证 Oracle。 |
+| 真机接入与联调 | 实现 `tron2_real.py` 和独立运动服务，完成标定与保护测试后先验证真机 Oracle。[接入顺序](docs/tron2_hardware.md#验收顺序) |
 | 连续录像 | 目前可读取 RGB-D 快照，还需为每回合接入连续录像及其时间戳。 |
 
 ## 上游 CaP-X

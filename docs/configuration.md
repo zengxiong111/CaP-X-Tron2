@@ -47,6 +47,10 @@ num_workers: 12
 
 The `_target_` keys enable Hydra-style lazy instantiation via `capx.envs.configs.instantiate()`.
 
+### TRON2 profiles
+
+[TRON2 task YAMLs](../env_configs/tron2/) construct `Tron2MujocoEnv` in `env.cfg.low_level`. Mock sets `backend: mock`; S1 sets `backend: mujoco` and `privileged: true`; S2 sets `backend: mujoco`, `privileged: false`, `enable_render: true`, and `visual_pose: true`. S1 and S2 read the vendor model path from `TRON2_MJCF_PATH` unless `model_path` is given. Keep `record_video: false` for TRON2. See the [TRON2 bring-up guide](tron2_bringup.md) for setup and evaluation commands.
+
 ### Perception servers (api_servers)
 
 YAML configs can include an `api_servers` section that **auto-launches** perception servers when the evaluation starts:

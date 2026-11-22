@@ -2,6 +2,10 @@
 
 ## Testing
 
+### TRON2
+
+Use the standalone dependencies in the [TRON2 bring-up guide](tron2_bringup.md) and run `python -m pytest -q tests/tron2`. Set `TRON2_MJCF_PATH` to include the DACH_TRON2A checks, and `TRON2_TEST_RENDER=1` to include the RGB-D check. When changing [the task scene](../capx/envs/assets/tron2_tasks/tabletop.xml), run the S1 and S2 Oracle evaluations with the same seeds and compare task completion.
+
 ### Unit tests
 
 ```bash

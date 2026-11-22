@@ -1,16 +1,16 @@
-# CaP-X-Tron2 实施与验收
+# TRON2 仿真运行与验收
 
-本仓库通过 CaP-X 运行 **Cube Lift** 和 **Pick & Place**。先用 Mock 检查工具调用、任务判定与失败重试，再用官方 DACH_TRON2A 模型验证 MuJoCo 接触，最后使用 RGB-D 估计的位置执行相同任务。三种配置运行同一份 Oracle，也可以通过同一个 CaP-X 入口调用模型。
+按 **Mock → MuJoCo S1 → MuJoCo S2** 的顺序运行 Cube Lift 和 Pick & Place。三种配置共用任务工具和手写 Oracle，S1 和 S2 共用同一套物理场景。[架构和工具约定](tron2_architecture.md) · [真机接入路线](tron2_hardware.md)
 
-| 配置 | 观测与运动 | 用途 |
+| 配置 | 物体位置来源 | 验证目标 |
 | --- | --- | --- |
-| `cube_lift_mock.yaml` / `pick_place_mock.yaml` | 可重复的内存状态与模拟抓放 | 快速检查代码执行和错误反馈 |
-| `cube_lift_s1.yaml` / `pick_place_s1.yaml` | MuJoCo 接触物理与仿真真值位姿 | 检查 DACH_TRON2A 双臂的运动，以及单臂抓放 |
-| `cube_lift_s2.yaml` / `pick_place_s2.yaml` | MuJoCo 接触物理与 RGB-D 中心估计 | 检查不使用仿真真值位姿的抓放 |
+| [`*_mock.yaml`](../env_configs/tron2/) | 内存中的模拟状态 | 代码执行、动作反馈和重试。 |
+| [`*_s1.yaml`](../env_configs/tron2/) | 仿真真值 | DACH_TRON2A 模型上的运动、物理接触和抓放。 |
+| [`*_s2.yaml`](../env_configs/tron2/) | RGB-D 中心估计 | 通过视觉定位后的抓放。 |
 
-## 1. 安装和验证工具链
+## 1. 安装与 Mock 验证
 
-在仓库根目录使用 Python 3.10–3.12 创建环境。TRON2 的本地评测只需 `requirements-tron2.txt` 中的依赖。
+在仓库根目录用 Python 3.10–3.12 创建环境并安装 [TRON2 仿真依赖](../requirements-tron2.txt)。Oracle 用固定脚本离线执行任务。
 
 ```bash
 python3 -m venv .venv
@@ -19,18 +19,18 @@ python -m pip install -r requirements-tron2.txt
 
 python -m capx.envs.launch \
   --config-path env_configs/tron2/cube_lift_mock.yaml \
-  --use-oracle-code True --total-trials 2
+  --use-oracle-code True --total-trials 1
 
 python -m capx.envs.launch \
   --config-path env_configs/tron2/pick_place_mock.yaml \
-  --use-oracle-code True --total-trials 2
+  --use-oracle-code True --total-trials 1
 ```
 
-Mock 的成果仅用于检查软件路径。评测输出中的 `Task completed` 才是达到任务判据的次数。`Code generation success rate` 统计代码执行成功的比例。
+确认两条命令的 `Task completed` 都为 1。Mock 结果用于检查代码执行和任务判定，物理抓放由 S1 和 S2 验证。
 
 ## 2. 用官方 DACH_TRON2A 模型评测
 
-模型与网格保存在 `tron2-robot-description`。这里使用 LimX 仿真器固定引用的版本，将资产放在仓库外，由 `TRON2_MJCF_PATH` 指向带 2F 夹爪的 `robot_grasper.xml`。资产由 LimX 发布，适用上游 Apache-2.0 许可。[LimX 仿真器](https://github.com/limxdynamics/tron2_mujoco_sim) · [固定版本的模型和许可](https://github.com/limxdynamics/tron2-robot-description/tree/9939c22e69d27653ec0ba8a505859a2903dd1a71)
+将 LimX 的机器人描述下载到仓库旁边。`TRON2_MJCF_PATH` 指向带 2F 夹爪的 `robot_grasper.xml`，保留同一模型目录下的 `meshes/`。本仓库的[桌面场景](../capx/envs/assets/tron2_tasks/tabletop.xml)由后端在加载时合并到官方模型。[LimX 仿真器](https://github.com/limxdynamics/tron2_mujoco_sim) · [固定版本的模型和许可](https://github.com/limxdynamics/tron2-robot-description/tree/9939c22e69d27653ec0ba8a505859a2903dd1a71)
 
 ```bash
 git clone --filter=blob:none --no-checkout \
@@ -49,11 +49,11 @@ python -m capx.envs.launch \
   --use-oracle-code True --total-trials 20
 ```
 
-CLI 以试验编号作为随机种子，将过程和汇总写入 `outputs/`。仿真在本进程加载机械模型并推进物理帧。SDK 通信桥、机器人控制器和网络均不参与此路径。
+S1 默认无渲染，在本进程推进 MuJoCo，适合先检查工作空间、IK、夹持与释放。
 
 ## 3. 用 RGB-D 评测 S2
 
-S2 使用头部相机检测红色方块和绿色目标。头部观测失败时尝试外部相机。估计器用深度、内参和当前相机外参把像素投影到机器人基座坐标系，针对已知尺寸的直立方块估计中心。返回的四元数是直立场景约定，旋转没有从图像测量。两台相机都无法估计时，工具会明确报告观测失败。
+使用和 S1 相同的 `TRON2_MJCF_PATH`。S2 需要可用的 MuJoCo 渲染环境，先尝试用头部相机估计红色方块和绿色目标的中心，观测失败时再尝试外部相机。S2 对直立、已知尺寸的方块估计位置，旋转仍使用场景约定。
 
 ```bash
 python -m capx.envs.launch \
@@ -65,11 +65,11 @@ python -m capx.envs.launch \
   --use-oracle-code True --total-trials 20
 ```
 
-S2 需要 MuJoCo 渲染环境。`get_image` 可读取头部、双腕和外部相机的 RGB-D 快照。S1 和 Mock 的默认配置不需要创建渲染上下文。TRON2 当前提供快照，CaP-X 的连续录像选项尚未接入。
+`get_image` 可读取头部、双腕和外部相机的 RGB-D 快照。连续录像仍待接入，运行现有配置时保持 `record_video: false`。
 
 ## 4. 接入模型并检查失败反馈
 
-用同一份 S1 配置，传入可访问的 Chat Completions 端点与模型名。
+Oracle 跑通后，可用任务配置接入 Chat Completions 端点评估实际模型。先从 S1 和一个试验开始，再与 S2 分开记录结果。
 
 ```bash
 python -m capx.envs.launch \
@@ -77,13 +77,11 @@ python -m capx.envs.launch \
   --server-url "$CAPX_MODEL_URL" --model "$CAPX_MODEL_NAME" --total-trials 1
 ```
 
-六个工具使用同一个 `robot_base` 坐标系。位姿为 `[x, y, z, qw, qx, qy, qz]`，位置单位为米。`move_ee`、`open_gripper`、`close_gripper` 返回 `success`、`code` 和 `message`。脚本应在动作失败后读取结果，重新观察机器人与方块，再决定下一步。CaP-X 也会把回合状态连同标准输出和异常传给模型，用于生成下一回合代码。
-
-方块由指尖的物理接触夹持。Lift 要求方块比初始高度高至少 7 cm 并稳定握持至少 0.25 秒。Pick & Place 要求执行过夹持与释放，且方块在半径 3.5 cm 的目标区内稳定至少 0.25 秒。RGB-D 接口返回米制深度、相机内参 `K`、`T_base_camera` 和时间戳。外参把右、下、前分别为正 X、Y、Z 的光学坐标变换到 `robot_base`。
+任务配置把动作结果、失败原因和当前状态传给下一回合。可从 `all_responses.json` 查看模型是否根据失败反馈重新生成代码。当前执行器在本进程运行仿真代码，真机评测需按[真机接入路线](tron2_hardware.md)另行部署。
 
 ## 5. 验收记录
 
-Python 3.12、MuJoCo 3.17.0、macOS arm64，经 CaP-X CLI 使用 Oracle 跑种子 1–20。
+仿真基线使用 Python 3.12、MuJoCo 3.17.0 和 macOS arm64，经 CaP-X CLI 使用 Oracle 运行种子 1–20。CLI 以试验编号作为随机种子。
 
 | 配置 | Cube Lift | Pick & Place |
 | --- | ---: | ---: |
@@ -91,7 +89,9 @@ Python 3.12、MuJoCo 3.17.0、macOS arm64，经 CaP-X CLI 使用 Oracle 跑种�
 | MuJoCo S1 | 20/20 | 20/20 |
 | MuJoCo S2 | 20/20 | 20/20 |
 
-回归测试用固定的模型响应触发一次空抓，检查下一回合收到失败原因，并在同一场景完成抬升。实际语言模型的生成质量需要用自己的模型端点评估。
+结果写入配置指定的输出路径，路径会包含模型名，Oracle 使用 `oracle`。在 `summaries.txt` 看 `Task completed`，它统计达到任务判据的次数。`Code generation success rate` 统计代码成功执行的比例。各试验目录的 `code.py`、`summary.txt` 和 `all_responses.json` 可用于复盘执行代码和多轮反馈。
+
+回归覆盖固定种子复位、动作拒绝与限额、Oracle、S2 估计以及模拟模型空抓后在同一场景重试。上表是 Oracle 基线，实际模型与真机需要分别评测。
 
 ```bash
 python -m pip install pytest
@@ -100,6 +100,10 @@ TRON2_TEST_RENDER=1 python -m pytest -q tests/tron2
 
 未设置 `TRON2_MJCF_PATH` 时会跳过实际模型测试。默认跳过需要渲染的 S2 检查，可用上述开关启用。
 
-## 6. 真机里程碑
+## 6. 故障定位
 
-真机传输使用 [LimX tron2_env](https://github.com/limxdynamics/tron2_env) 的 WebSocket 运行时。一台有对应型号、夹爪、相机和急停的设备，以及测得的 TCP、工作空间、关节和速度/力限制，是调试前提。实施时将机器人运动放在独立服务，在本地由受限高层 API 执行。先在监督下测试空载运动、超时、掉线、碰撞和人工复位，再运行固定 Oracle 并保留结果。当前 CaP-X 执行器在本进程运行 Python，仅用于可信仿真；仓库未注册真机执行环境。
+| 现象 | 先检查 |
+| --- | --- |
+| 模型或网格找不到 | `TRON2_MJCF_PATH` 是否指向 `DACH_TRON2A/xml/robot_grasper.xml`，以及该 `xml/` 的同级 `meshes/` 是否完整。 |
+| S2 相机无法渲染 | 先用同一台机器跑 S1，随后检查 MuJoCo 渲染环境。Linux 的启动器默认使用 EGL。 |
+| `empty_grasp`、`ik_unreachable` 或 `collision` | 查看 `TRON2 feedback` 和试验日志，再读取当前 TCP 和物体位置。修改场景或运动参数时用相同种子复跑。 |

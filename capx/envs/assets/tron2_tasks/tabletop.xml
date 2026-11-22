@@ -1,0 +1,22 @@
+<mujoco model="tron2_tabletop">
+  <!-- Task objects in the DACH_TRON2A MuJoCo world frame. -->
+  <worldbody>
+    <camera name="overview" pos="1.25 -1.05 1.33" fovy="49" xyaxes=".71 .7 0 -.3 .3 .905" />
+    <geom name="task_table" type="box" pos="0.43 0 0.595" size=".23 .36 .025"
+          rgba=".62 .55 .44 1" friction=".9 .01 .001" margin=".0002" />
+    <site name="task_goal" type="cylinder" pos="0.445 -0.111 0.6204" size=".035 .0004"
+          rgba=".15 .7 .3 .5" />
+    <body name="task_cube" pos="0.36 -0.19 0.64">
+      <freejoint name="task_cube" />
+      <geom name="task_cube" type="box" mass=".035" size="0.02 0.02 0.02" rgba=".88 .12 .1 1"
+            contype="2" conaffinity="3" condim="4" friction="1.05 .02 .001"
+            margin=".0002" solref=".004 1" />
+    </body>
+    <body name="task_distractor" pos="0.4 0.16 0.64">
+      <freejoint name="task_distractor" />
+      <geom name="task_distractor" type="box" mass=".035" size="0.02 0.02 0.02" rgba=".12 .25 .85 1"
+            contype="2" conaffinity="3" condim="4" friction="1.05 .02 .001"
+            margin=".0002" solref=".004 1" />
+    </body>
+  </worldbody>
+</mujoco>

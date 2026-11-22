@@ -1,5 +1,9 @@
 # Adding a New Simulator / Task / Robot
 
+## TRON2 example
+
+The TRON2 implementation uses [Tron2MujocoEnv](../capx/envs/simulators/tron2_mujoco.py) for reset, observations, and task evaluation. [The task classes](../capx/envs/tasks/tron2/) own prompts, Oracle code, and retry feedback. Each [TRON2 YAML](../env_configs/tron2/) creates its own low-level environment. Update [the packaged tabletop MJCF](../capx/envs/assets/tron2_tasks/tabletop.xml) for scene changes and use the [TRON2 architecture guide](tron2_architecture.md) for registration and backend boundaries.
+
 ## Step 1: Create a simulator wrapper
 
 Subclass `BaseEnv` in `capx/envs/simulators/`. Implement the five required methods:
