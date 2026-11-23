@@ -1,0 +1,18 @@
+env:
+  _target_: capx.envs.tasks.tron2.cube_lift.Tron2CubeLiftCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: cube_lift
+      backend: mujoco
+      privileged: true
+      enable_render: false
+      max_attempts: 1
+    apis: [Tron2ControlApi]
+
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/cube_lift_s1_single
+trials: 20
+num_workers: 1

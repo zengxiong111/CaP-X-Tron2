@@ -1,109 +1,96 @@
 # TRON2 仿真运行与验收
 
-按 **Mock → MuJoCo S1 → MuJoCo S2** 的顺序运行 Cube Lift 和 Pick & Place。三种配置共用任务工具和手写 Oracle，S1 和 S2 共用同一套物理场景。[架构和工具约定](tron2_architecture.md) · [真机接入路线](tron2_hardware.md)
+在 MuJoCo 中回放 Cube Lift，运行手写 Oracle，并对比真实代码模型的单轮和多轮表现。本文命令均在仓库根目录运行。
 
-| 配置 | 物体位置来源 | 验证目标 |
-| --- | --- | --- |
-| [`*_mock.yaml`](../env_configs/tron2/) | 内存中的模拟状态 | 代码执行、动作反馈和重试。 |
-| [`*_s1.yaml`](../env_configs/tron2/) | 仿真真值 | DACH_TRON2A 模型上的运动、物理接触和抓放。 |
-| [`*_s2.yaml`](../env_configs/tron2/) | RGB-D 中心估计 | 通过视觉定位后的抓放。 |
+[English](tron2_bringup.en.md) · [工具与坐标系](tron2_architecture.md)
 
-## 1. 安装与 Mock 验证
+## 目录
 
-在仓库根目录用 Python 3.10–3.12 创建环境并安装 [TRON2 仿真依赖](../requirements-tron2.txt)。Oracle 用固定脚本离线执行任务。
+- [环境与官方模型](#setup)
+- [MuJoCo 图形回放](#replay)
+- [Oracle 基线](#oracle)
+- [真实模型对照](#model-eval)
+- [验收结果](#results)
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-tron2.txt
+<a id="setup"></a>
+<a id="2-用官方-dach_tron2a-模型评测"></a>
 
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/cube_lift_mock.yaml \
-  --use-oracle-code True --total-trials 1
+## 环境与官方模型
 
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/pick_place_mock.yaml \
-  --use-oracle-code True --total-trials 1
-```
+1. 用 Python 3.10–3.12 建立独立环境。下方命令安装 TRON2 仿真依赖。
 
-确认两条命令的 `Task completed` 都为 1。Mock 结果用于检查代码执行和任务判定，物理抓放由 S1 和 S2 验证。
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install -r requirements-tron2.txt
+   ```
 
-## 2. 用官方 DACH_TRON2A 模型评测
+2. 将官方 DACH_TRON2A 模型和网格存放在仓库旁边。Mock 可直接跳到 [Oracle 基线](#oracle)。[LimX 模型与许可](https://github.com/limxdynamics/tron2-robot-description/tree/9939c22e69d27653ec0ba8a505859a2903dd1a71)
 
-将 LimX 的机器人描述下载到仓库旁边。`TRON2_MJCF_PATH` 指向带 2F 夹爪的 `robot_grasper.xml`，保留同一模型目录下的 `meshes/`。本仓库的[桌面场景](../capx/envs/assets/tron2_tasks/tabletop.xml)由后端在加载时合并到官方模型。[LimX 仿真器](https://github.com/limxdynamics/tron2_mujoco_sim) · [固定版本的模型和许可](https://github.com/limxdynamics/tron2-robot-description/tree/9939c22e69d27653ec0ba8a505859a2903dd1a71)
+   ```bash
+   git clone --filter=blob:none --no-checkout \
+     https://github.com/limxdynamics/tron2-robot-description.git ../tron2-robot-description
+   git -C ../tron2-robot-description sparse-checkout set --no-cone \
+     '/LICENSE' '/tron2a/DACH_TRON2A/xml/robot_grasper.xml' '/tron2a/DACH_TRON2A/meshes/'
+   git -C ../tron2-robot-description checkout --detach 9939c22e69d27653ec0ba8a505859a2903dd1a71
+   export TRON2_MJCF_PATH="$PWD/../tron2-robot-description/tron2a/DACH_TRON2A/xml/robot_grasper.xml"
+   ```
 
-```bash
-git clone --filter=blob:none --no-checkout \
-  https://github.com/limxdynamics/tron2-robot-description.git ../tron2-robot-description
-git -C ../tron2-robot-description sparse-checkout set --no-cone \
-  '/LICENSE' '/tron2a/DACH_TRON2A/xml/robot_grasper.xml' '/tron2a/DACH_TRON2A/meshes/'
-git -C ../tron2-robot-description checkout --detach 9939c22e69d27653ec0ba8a505859a2903dd1a71
-export TRON2_MJCF_PATH="$PWD/../tron2-robot-description/tron2a/DACH_TRON2A/xml/robot_grasper.xml"
+<a id="replay"></a>
 
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/cube_lift_s1.yaml \
-  --use-oracle-code True --total-trials 20
+## MuJoCo 图形回放
 
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/pick_place_s1.yaml \
-  --use-oracle-code True --total-trials 20
-```
-
-S1 默认无渲染，在本进程推进 MuJoCo，适合先检查工作空间、IK、夹持与释放。
-
-## 3. 用 RGB-D 评测 S2
-
-使用和 S1 相同的 `TRON2_MJCF_PATH`。S2 需要可用的 MuJoCo 渲染环境，先尝试用头部相机估计红色方块和绿色目标的中心，观测失败时再尝试外部相机。S2 对直立、已知尺寸的方块估计位置，旋转仍使用场景约定。
+在有图形桌面的 Linux 上，使用 MuJoCo 3.17.0 运行经验证的种子 1。程序直接执行已保存的模型代码。窗口显示仿真判分和抬升高度，按 **R** 重播。[模型生成的程序](../capx/envs/assets/tron2_tasks/cube_lift_qwen.txt)
 
 ```bash
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/cube_lift_s2.yaml \
-  --use-oracle-code True --total-trials 20
-
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/pick_place_s2.yaml \
-  --use-oracle-code True --total-trials 20
+MUJOCO_GL=glfw python -m capx.envs.replay_tron2_cube_lift
 ```
 
-`get_image` 可读取头部、双腕和外部相机的 RGB-D 快照。连续录像仍待接入，运行现有配置时保持 `record_video: false`。
+<a id="oracle"></a>
 
-## 4. 接入模型并检查失败反馈
+## Oracle 基线
 
-Oracle 跑通后，可用任务配置接入 Chat Completions 端点评估实际模型。先从 S1 和一个试验开始，再与 S2 分开记录结果。
+Cube Lift 的三份配置分别使用 Mock、仿真真值位姿和 RGB-D 估计。S2 需要可用的渲染环境，Linux 的启动器默认使用 EGL。运行 Pick & Place 时将配置文件名中的 `cube_lift` 换成 `pick_place`。
 
 ```bash
-python -m capx.envs.launch \
-  --config-path env_configs/tron2/cube_lift_s1.yaml \
-  --server-url "$CAPX_MODEL_URL" --model "$CAPX_MODEL_NAME" --total-trials 1
+for mode in mock s1 s2; do
+  python -m capx.envs.launch \
+    --config-path "env_configs/tron2/cube_lift_${mode}.yaml" \
+    --use-oracle-code True --total-trials 20
+done
 ```
 
-任务配置把动作结果、失败原因和当前状态传给下一回合。可从 `all_responses.json` 查看模型是否根据失败反馈重新生成代码。当前执行器在本进程运行仿真代码，真机评测需按[真机接入路线](tron2_hardware.md)另行部署。
+用 `TRON2_TEST_RENDER=1 python -m pytest -q tests/tron2` 运行含 RGB-D 的回归检查。环境需安装 `pytest` 并设置 `TRON2_MJCF_PATH`。
 
-## 5. 验收记录
+<a id="model-eval"></a>
 
-仿真基线使用 Python 3.12、MuJoCo 3.17.0 和 macOS arm64，经 CaP-X CLI 使用 Oracle 运行种子 1–20。CLI 以试验编号作为随机种子。
+## 真实模型对照
 
-| 配置 | Cube Lift | Pick & Place |
-| --- | ---: | ---: |
-| Mock | 20/20 | 20/20 |
-| MuJoCo S1 | 20/20 | 20/20 |
-| MuJoCo S2 | 20/20 | 20/20 |
-
-结果写入配置指定的输出路径，路径会包含模型名，Oracle 使用 `oracle`。在 `summaries.txt` 看 `Task completed`，它统计达到任务判据的次数。`Code generation success rate` 统计代码成功执行的比例。各试验目录的 `code.py`、`summary.txt` 和 `all_responses.json` 可用于复盘执行代码和多轮反馈。
-
-回归覆盖固定种子复位、动作拒绝与限额、Oracle、S2 估计以及模拟模型空抓后在同一场景重试。上表是 Oracle 基线，实际模型与真机需要分别评测。
+连接已运行的 OpenAI 兼容 Chat Completions 端点。`CAPX_MODEL_URL` 是完整端点 URL，`CAPX_MODEL_NAME` 是端点接受的模型 ID。此次使用本地 Qwen2.5-Coder-3B-Instruct 和 BF16 贪心解码。[模型权重复现版本](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct/tree/488639f1ff808d1d3d0ba301aef8c11461451ec5) · [端点配置](configuration.md#adding-new-llm-providers)
 
 ```bash
-python -m pip install pytest
-TRON2_TEST_RENDER=1 python -m pytest -q tests/tron2
+for config in cube_lift_s1_single cube_lift_s1 cube_lift_s1_guided_single cube_lift_s1_guided_multi; do
+  python -m capx.envs.launch \
+    --config-path "env_configs/tron2/${config}.yaml" \
+    --server-url "$CAPX_MODEL_URL" --model "$CAPX_MODEL_NAME" \
+    --temperature 0 --max-tokens 768 --total-trials 20
+done
 ```
 
-未设置 `TRON2_MJCF_PATH` 时会跳过实际模型测试。默认跳过需要渲染的 S2 检查，可用上述开关启用。
+四份配置使用种子 1–20 和仿真真值位姿。每种提示词的两组共享初始提示和动作预算。单轮允许一次代码执行，多轮最多六次。`summaries.txt` 的 `Task completed` 对应物理成功数，`all_responses.json` 记录生成与重试。
 
-## 6. 故障定位
+<a id="results"></a>
+<a id="5-验收记录"></a>
 
-| 现象 | 先检查 |
+## 验收结果
+
+| 评测 | 结果 |
 | --- | --- |
-| 模型或网格找不到 | `TRON2_MJCF_PATH` 是否指向 `DACH_TRON2A/xml/robot_grasper.xml`，以及该 `xml/` 的同级 `meshes/` 是否完整。 |
-| S2 相机无法渲染 | 先用同一台机器跑 S1，随后检查 MuJoCo 渲染环境。Linux 的启动器默认使用 EGL。 |
-| `empty_grasp`、`ik_unreachable` 或 `collision` | 查看 `TRON2 feedback` 和试验日志，再读取当前 TCP 和物体位置。修改场景或运动参数时用相同种子复跑。 |
+| Cube Lift Oracle 重跑 | Mock、MuJoCo S1、MuJoCo S2 均为 20/20 |
+| 原始提示词 | 单轮和多轮均为 0/20，程序闭爪后缺少抬升指令，多轮每次均重写五次 |
+| 明确五步动作及脚本格式 | 单轮和多轮均为 20/20，全部首轮完成，方块中心升高 11.95–11.97 cm |
+| TRON2 回归 | 7 项通过 |
+
+Cube Lift 判分要求方块保持夹持，中心升高至少 7 cm，并在 0.25 秒稳定窗口内保持速度不高于 0.04 m/s。验收使用源码 `ce2e708228badee5ba601ebcc03f6aaa069d33cf`、Linux、Python 3.12.3、MuJoCo 3.17.0 和桌面世界高度 0.620 m。发布的回放程序 SHA-256 为 `2d7ad6a562b64e03d9179b0980c122044cdf6b783bf6a70f842553ca47531881`。
+
+仓库此前记录的 Pick & Place Oracle 在同三种配置上均为 20/20。本次真实模型数据覆盖 **Cube Lift 真值位姿**。图形回放展示保存的程序，逐回合连续录像仍待接入。

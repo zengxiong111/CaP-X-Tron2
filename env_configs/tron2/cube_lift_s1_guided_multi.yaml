@@ -1,0 +1,35 @@
+env:
+  _target_: capx.envs.tasks.tron2.cube_lift.Tron2CubeLiftCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: cube_lift
+      backend: mujoco
+      privileged: true
+      enable_render: false
+    apis: [Tron2ControlApi]
+    prompt: |-
+      Write straight-line Python to lift the cube. No loops. No sleeps. No imports. Stop on any failed tool call.
+      Read x, y, z from get_object_pose("cube")[:3]. Read q from get_robot_state()["grasp_quaternions"]["right"].
+      Use these five actions in this order:
+      - open_gripper("right")
+      - move_ee("right", [x, y, z + 0.09, *q])
+      - move_ee("right", [x, y, z, *q])
+      - close_gripper("right")
+      - move_ee("right", [x, y, z + 0.12, *q])
+      The last move must occur after close_gripper and the gripper must remain closed. For each tool call, assert that the returned dict has success=True. After the last move, check get_object_pose("cube")[2] >= z + 0.07. This Python is executed at module scope. Never use a return statement. Print the final cube pose. Output only one fenced Python code block.
+    multi_turn_prompt: |
+      Executed code:
+      {executed_code}
+      Console output and TRON2 episode feedback:
+      {console_stdout}
+      Execution errors:
+      {console_stderr}
+      If the task is incomplete, use the current poses and failure reason to plan a new attempt.
+
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/cube_lift_s1_guided_multi
+trials: 20
+num_workers: 1

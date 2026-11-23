@@ -199,6 +199,7 @@ extend-exclude = [
 [tool.setuptools.package-data]
 "capx.envs" = [
   "assets/tron2_tasks/*.xml",
+  "assets/tron2_tasks/cube_lift_qwen.txt",
   "assets/ur5_pick_place/*.xml",
   "assets/ur5_pick_place/ur5e/*.obj",
   "assets/ur5_pick_place/robotiq_2f85/*.stl",

@@ -1,0 +1,30 @@
+# Code block 0
+import numpy as np
+
+# Read the current object pose of the cube
+pose = get_object_pose("cube")[:3]
+x, y, z = pose
+
+# Read the grasp quaternion of the right gripper
+q = get_robot_state()["grasp_quaternions"]["right"]
+
+# Open the gripper
+open_gripper("right")
+
+# Move the end effector to the initial position above the cube
+move_ee("right", [x, y, z + 0.09, *q])
+
+# Move the end effector to the initial position touching the cube
+move_ee("right", [x, y, z, *q])
+
+# Close the gripper
+close_gripper("right")
+
+# Move the end effector to the final position above the cube
+move_ee("right", [x, y, z + 0.12, *q])
+
+# Check if the cube is lifted
+assert get_object_pose("cube")[2] >= z + 0.07, "Cube is not lifted"
+
+# Print the final cube pose
+print(get_object_pose("cube"))
