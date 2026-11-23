@@ -13,6 +13,12 @@ _CUBE_HALF_SIZE = 0.02
 _MIN_VISIBLE_PIXELS = 20
 
 
+def cube_color_mask(image: np.ndarray) -> np.ndarray:
+    """Classify the red pixels used by the RGB-D cube pose tool."""
+    red, green, blue = np.asarray(image, dtype=np.int16).transpose(2, 0, 1)
+    return (red - green > 45) & (red - blue > 40)
+
+
 def estimate_tabletop_pose(frame: CameraFrame, name: str) -> Pose:
     """Estimate the red cube or the green target's center using one calibrated frame.
 
@@ -29,10 +35,10 @@ def estimate_tabletop_pose(frame: CameraFrame, name: str) -> Pose:
     if intrinsics.shape != (3, 3) or transform.shape != (4, 4):
         raise ObservationUnavailableError("RGB-D camera calibration is incomplete")
 
-    red, green, blue = rgb.transpose(2, 0, 1)
     if name == "cube":
-        mask = (red - green > 45) & (red - blue > 40)
+        mask = cube_color_mask(rgb)
     elif name == "target":
+        red, green, blue = rgb.transpose(2, 0, 1)
         mask = (green - red > 28) & (green - blue > 28)
     else:
         raise ObservationUnavailableError(f"Unknown tabletop object: {name!r}")

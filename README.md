@@ -24,6 +24,8 @@ Cube Lift 的手写 Oracle 在 Mock、MuJoCo 真值和 RGB-D 三种配置中均�
 
 固定 +X 偏移下，真值位置、RGB-D 文本和 RGB-D 文本 + SmolVLM 三组均从首轮 **0/20** 恢复到 **20/20**。在 +X 和 −Y 的配对评测中，目标跟踪版 VDM 判对 **20/20** 个图像移动方向，文本组和文本 + VDM 组均恢复 **20/20**。 [恢复结果与复跑命令](docs/tron2_recovery.md)
 
+另在 **0.450 m 安装高差**的独立布局中加入头部相机遮挡。20 对新种子全部恢复，VDM 判对 **20/20** 个方向。 [遮挡评测、复跑命令与安装限制](docs/tron2_calibrated_occlusion.md)
+
 ## 打开图形回放
 
 完成[环境与模型设置](docs/tron2_bringup.md#setup)后，在仓库根目录运行以下命令。MuJoCo 会执行已通过验收的模型代码，按 **R** 重播。

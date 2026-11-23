@@ -24,6 +24,8 @@ The original program omitted the lift command after closing the gripper. With ex
 
 With a fixed +X shift, the ground-truth position, RGB-D text, and RGB-D text + SmolVLM arms all recovered from **0/20** on the first turn to **20/20**. In the paired +X and −Y evaluation, target-motion VDM identified **20/20** image directions correctly, and the text and text + VDM arms each recovered **20/20**. [Recovery results and commands](docs/tron2_recovery.en.md)
 
+A separate layout with a **0.450 m mounting gap** added head-camera occlusion. Both arms recovered on all 20 new seeds, and VDM identified **20/20** directions correctly. [Occlusion results, commands, and mounting limits](docs/tron2_calibrated_occlusion.en.md)
+
 ## Open the visual replay
 
 Complete the [runtime and robot model setup](docs/tron2_bringup.en.md#setup), then run this from the repository root. MuJoCo executes the validated model program. Press **R** to replay it.

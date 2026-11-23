@@ -1,6 +1,7 @@
 """MuJoCo backend with one controlled disturbance for Cube Lift evaluation."""
 
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -13,8 +14,10 @@ class RecoveryMujocoBackend(MujocoBackend):
 
     OFFSET_M = 0.075
 
-    def __init__(self, *, alternate_offsets: bool = False) -> None:
-        super().__init__(enable_render=True)
+    def __init__(
+        self, *, alternate_offsets: bool = False, model_path: str | Path | None = None
+    ) -> None:
+        super().__init__(model_path=model_path, enable_render=True)
         self.disturbance: dict | None = None
         self._approach_pending = False
         self._alternate_offsets = alternate_offsets

@@ -15,13 +15,15 @@ def _rgb(data: bytes) -> np.ndarray:
         return np.asarray(image.convert("RGB"), dtype=np.int16)
 
 
+def red_target_mask(image: np.ndarray) -> np.ndarray:
+    """Classify the saturated red pixels used by the motion tracker."""
+    red, green, blue = np.asarray(image, dtype=np.int16).transpose(2, 0, 1)
+    return (red > 100) & (red > green * 1.35) & (red > blue * 1.25) & (red - green > 35)
+
+
 def _center(image: np.ndarray) -> np.ndarray | None:
     """Find the robust centroid of saturated red pixels."""
-    red = image[..., 0]
-    green = image[..., 1]
-    blue = image[..., 2]
-    mask = (red > 100) & (red > green * 1.35) & (red > blue * 1.25) & ((red - green) > 35)
-    ys, xs = np.nonzero(mask)
+    ys, xs = np.nonzero(red_target_mask(image))
     if len(xs) < MIN_RED_PIXELS:
         return None
 

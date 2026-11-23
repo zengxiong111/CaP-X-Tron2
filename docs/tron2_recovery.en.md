@@ -2,6 +2,8 @@
 
 This page records the TRON2 Cube Lift recovery experiments completed on 2026-11-23, covering ground-truth pose, paired RGB-D recovery, and red cube motion detection.
 
+These runs used the vendor MJCF's original base layout, with the tabletop at world Z = 0.620 m and `base_Link` at world Z = 1.210 m. [Follow-up occlusion evaluation at a 0.450 m mounting gap](tron2_calibrated_occlusion.en.md)
+
 [简体中文](tron2_recovery.md) · [Simulation environment and official assets](tron2_bringup.en.md#setup)
 
 ## Contents

@@ -2,6 +2,8 @@
 
 本页记录 2026-11-23 完成的 TRON2 Cube Lift 恢复试验，涵盖真值位姿、RGB-D 配对恢复和红色方块移动识别。
 
+本页使用官方 MJCF 的原始基座布局。桌面世界 Z 为 0.620 m，`base_Link` 世界 Z 为 1.210 m。 [0.450 m 安装高差下的后续遮挡评测](tron2_calibrated_occlusion.md)
+
 [English](tron2_recovery.en.md) · [仿真环境与官方资产](tron2_bringup.md#setup)
 
 ## 目录

@@ -155,7 +155,7 @@ def write_report(report, output):
     temporary.replace(output)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--trials", type=int, default=20)
@@ -178,7 +178,7 @@ def main():
     )
     parser.add_argument("--vdm-model")
     parser.add_argument("--vdm-server-url")
-    options = parser.parse_args()
+    options = parser.parse_args(argv)
     if options.start_seed < 1 or options.trials < 1 or options.output.exists():
         parser.error("Use a positive start seed and trial count and a new output path")
     learned_vdm = bool(options.vdm_model or options.vdm_server_url)
