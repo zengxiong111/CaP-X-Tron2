@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from urllib.request import urlopen, Request as UrlRequest
@@ -36,6 +37,7 @@ from capx.web.models import (
     StopTrialResponse,
 )
 from capx.web.session_manager import Session, get_session_manager
+from capx.web.tron2_workflow import register_tron2_workflow
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,11 +71,20 @@ def _find_viser_port() -> int | None:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            await close_tron2_workflow()
+
     app = FastAPI(
         title="CaP-X Interactive Web UI",
         description="Real-time interactive interface for CaP-X robot code execution",
         version="1.0.0",
+        lifespan=lifespan,
     )
+    close_tron2_workflow = register_tron2_workflow(app)
 
     # CORS for frontend dev server
     app.add_middleware(

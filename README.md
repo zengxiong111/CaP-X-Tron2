@@ -4,6 +4,8 @@ CaP-X-Tron2 在 MuJoCo 中用 LimX DACH_TRON2A 双指夹爪执行模型生成的
 
 [English](README.en.md) · [仿真运行指南](docs/tron2_bringup.md) · [工具与坐标系](docs/tron2_architecture.md)
 
+[TRON2 Web 评估](docs/tron2_bringup.md#web-workflow)提供感知服务器、LLM 代理配置和 Cube Lift 运行入口。
+
 ## 目录
 
 - [仿真结果](#仿真结果)

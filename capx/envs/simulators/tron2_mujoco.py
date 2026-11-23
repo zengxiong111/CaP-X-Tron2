@@ -183,19 +183,22 @@ class Tron2MujocoEnv(BaseEnv):
         if not self.visual_pose:
             raise ObservationUnavailableError("Object poses require an S1 or S2 simulation profile")
 
-        from capx.integrations.tron2.perception import estimate_tabletop_pose
-
         if name not in ("cube", "target"):
             raise ObservationUnavailableError(f"Unknown tabletop object: {name!r}")
         try:
-            return estimate_tabletop_pose(self.get_image(_CAMERA_NAME), name)
+            return self._estimate_pose(self.get_image(_CAMERA_NAME), name)
         except ObservationUnavailableError as head_error:
             try:
-                return estimate_tabletop_pose(self.get_image("overview"), name)
+                return self._estimate_pose(self.get_image("overview"), name)
             except ObservationUnavailableError as overview_error:
                 raise ObservationUnavailableError(
                     f"Cannot estimate {name!r} from head ({head_error}) or overview ({overview_error})"
                 ) from overview_error
+
+    def _estimate_pose(self, frame: CameraFrame, name: str) -> Pose:
+        from capx.integrations.tron2.perception import estimate_tabletop_pose
+
+        return estimate_tabletop_pose(frame, name)
 
     def get_image(self, camera_name: str) -> CameraFrame:
         self._require_reset()

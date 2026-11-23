@@ -7,6 +7,7 @@
 ## 目录
 
 - [环境与官方模型](#setup)
+- [Web 评估](#web-workflow)
 - [MuJoCo 图形回放](#replay)
 - [Oracle 基线](#oracle)
 - [真实模型对照](#model-eval)
@@ -35,6 +36,26 @@
    git -C ../tron2-robot-description checkout --detach 9939c22e69d27653ec0ba8a505859a2903dd1a71
    export TRON2_MJCF_PATH="$PWD/../tron2-robot-description/tron2a/DACH_TRON2A/xml/robot_grasper.xml"
    ```
+
+<a id="web-workflow"></a>
+
+## Web 评估
+
+完成仿真环境和官方模型设置后，使用 Node.js 和 npm 构建现有 CaP-X Web 界面。Web 评估使用桌面世界 Z 0.620 m、安装高差 0.450 m 的 Cube Lift 场景。 [场景与支座限制](tron2_calibrated_occlusion.md#配置与边界)
+
+```bash
+npm ci --prefix web-ui
+npm run build --prefix web-ui
+python -m capx.web.server --host 127.0.0.1 --port 8200
+```
+
+从仿真电脑打开 [TRON2 评估页](http://127.0.0.1:8200/tron2)，按页面三个步骤运行。
+
+1. 点击 **启动感知服务器**。TRON2 RGB-D 服务默认使用 8121 端口。评估中的 `get_object_pose` 会把相机帧发送给该服务，必要时切换到 overview 相机。
+2. 在 **设置 LLM 代理** 填入已运行的本地 Chat Completions 完整地址与模型 ID，点击 **测试 LLM 连接**。页面默认填写本地 Qwen2.5-Coder-3B-Instruct 和 18086 端口。可按需要使用 CaP-X 的 OpenRouter 或 vLLM 服务。 [LLM 代理设置](configuration.md#adding-new-llm-providers)
+3. 选择起始种子与试验数，点击 **运行评估**。页面显示最新试验的 MuJoCo 画面、物理判分和 LLM 生成程序。**停止评估**结束当前试验进程。评估报告与图像默认写入 `outputs/tron2_web/`。
+
+Web 入口运行带头部相机遮挡的文本反馈恢复评估。配对 VDM 评测命令见独立指南。 [文本与 VDM 配对复跑](tron2_calibrated_occlusion.md#复跑步骤)
 
 <a id="replay"></a>
 

@@ -19,7 +19,9 @@ def cube_color_mask(image: np.ndarray) -> np.ndarray:
     return (red - green > 45) & (red - blue > 40)
 
 
-def estimate_tabletop_pose(frame: CameraFrame, name: str) -> Pose:
+def estimate_tabletop_pose(
+    frame: CameraFrame, name: str, *, workspace_z_offset: float = 0.0
+) -> Pose:
     """Estimate the red cube or the green target's center using one calibrated frame.
 
     The scene uses an upright cube, with a symmetric, unmarked top. The output
@@ -51,7 +53,14 @@ def estimate_tabletop_pose(frame: CameraFrame, name: str) -> Pose:
         raise ObservationUnavailableError("RGB-D camera intrinsics are singular") from exc
     optical_points = (rays * depth[rows, columns]).T
     base_points = optical_points @ transform[:3, :3].T + transform[:3, 3]
-    in_workspace = np.all((base_points >= _WORKSPACE_MIN) & (base_points <= _WORKSPACE_MAX), axis=1)
+    # Shift the workspace in base coordinates when the experiment moves the base.
+    if workspace_z_offset:
+        base_points_for_crop = base_points - (0.0, 0.0, workspace_z_offset)
+    else:
+        base_points_for_crop = base_points
+    in_workspace = np.all(
+        (base_points_for_crop >= _WORKSPACE_MIN) & (base_points_for_crop <= _WORKSPACE_MAX), axis=1
+    )
     points = base_points[in_workspace]
     if len(points) < _MIN_VISIBLE_PIXELS:
         raise ObservationUnavailableError(f"{name!r} is not visible in the tabletop RGB-D workspace")

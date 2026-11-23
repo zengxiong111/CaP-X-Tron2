@@ -24,7 +24,10 @@ from capx.integrations.tron2.calibrated_recovery import (
     CalibratedRecoveryBackend,
     write_calibrated_mjcf,
 )
+from capx.integrations.tron2.perception_service import request_pose
 from capx.integrations.tron2.target_motion import red_target_mask
+
+WORKSPACE_Z_SHIFT = round(VENDOR_BASE_Z - EXPERIMENT_BASE_Z, 3)
 
 
 def sha256(data):
@@ -62,6 +65,15 @@ def archived_rgb_replay(rgb, image, archived, expected_hash):
 class OcclusionEnv(evaluation.Tron2MujocoEnv):
     """Record the camera path for the existing S2 pose tool."""
 
+    def __init__(self, *, perception_url=None, **kwargs):
+        super().__init__(**kwargs)
+        self._perception_url = perception_url
+
+    def _estimate_pose(self, frame, name):
+        if self._perception_url:
+            return request_pose(self._perception_url, frame, name, WORKSPACE_Z_SHIFT)
+        return perception.estimate_tabletop_pose(frame, name, workspace_z_offset=WORKSPACE_Z_SHIFT)
+
     def get_object_pose(self, name):
         record = {"name": name, "cameras": [], "success": False}
         self._backend.pose_cameras = record["cameras"]
@@ -84,6 +96,8 @@ def main():
         allow_abbrev=False,
     )
     parser.add_argument("--baseline", type=Path, help="Text report from this experiment")
+    parser.add_argument("--perception-url", help="TRON2 RGB-D pose service base URL")
+    parser.add_argument("--record-overview", action="store_true", help="Save final overview frames")
     options, evaluator_args = parser.parse_known_args()
     if any(arg == "--camera" or arg.startswith("--camera=") for arg in evaluator_args):
         parser.error("The experiment uses the default head camera")
@@ -99,6 +113,8 @@ def main():
         "vendor_mjcf_sha256": sha256(vendor_path.read_bytes()),
         "head_patches_center_xy_width_height": [list(spec) for spec in HEAD_PATCHES],
     }
+    if options.perception_url:
+        metadata["perception_url"] = options.perception_url
     baseline_rows = {}
     if options.baseline:
         baseline = json.loads(options.baseline.read_text(encoding="utf-8"))
@@ -111,6 +127,7 @@ def main():
     original_encode = evaluation.encode_rgb
     original_execute = evaluation.execute
     original_write = evaluation.write_report
+    recorded_overview = set()
 
     def make_backend(**kwargs):
         nonlocal active
@@ -161,17 +178,21 @@ def main():
         row = report["seed_results"][-1]
         row["head_captures"] = list(active.captures)
         row["archived_rgb_replays"] = list(active.rgb_replays)
+        if options.record_overview and row["seed"] not in recorded_overview:
+            frame_dir = output.with_name(output.stem + "_frames")
+            frame = original_encode(active.get_image("overview"))
+            (frame_dir / f"{row['seed']:02d}_overview.png").write_bytes(frame)
+            recorded_overview.add(row["seed"])
         original_write(report, output)
 
-    # Scope both the temporary MJCF and the workspace shift to this evaluator.
-    # The shift preserves the world-coordinate workspace used by the pose tool.
-    crop_offset = np.array([0.0, 0.0, round(VENDOR_BASE_Z - EXPERIMENT_BASE_Z, 3)])
     with (
         TemporaryDirectory(prefix="capx-tron2-occlusion-") as directory,
-        patch.object(perception, "_WORKSPACE_MIN", perception._WORKSPACE_MIN + crop_offset),
-        patch.object(perception, "_WORKSPACE_MAX", perception._WORKSPACE_MAX + crop_offset),
         patch.object(evaluation, "RecoveryMujocoBackend", make_backend),
-        patch.object(evaluation, "Tron2MujocoEnv", OcclusionEnv),
+        patch.object(
+            evaluation,
+            "Tron2MujocoEnv",
+            lambda **kwargs: OcclusionEnv(perception_url=options.perception_url, **kwargs),
+        ),
         patch.object(evaluation, "execute", execute),
         patch.object(evaluation, "encode_rgb", encode),
         patch.object(evaluation, "write_report", write_report),

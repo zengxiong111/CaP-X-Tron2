@@ -169,6 +169,10 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--server-url", required=True)
+    parser.add_argument(
+        "--fail-fast-model", action="store_true",
+        help="Report model server errors without the batch evaluator's retry delay",
+    )
     parser.add_argument("--camera", choices=("head", "overview"), default="head")
     parser.add_argument("--baseline", type=Path)
     parser.add_argument(
@@ -197,6 +201,9 @@ def main(argv=None):
         server_url=options.server_url,
         temperature=0,
         max_tokens=768,
+        max_server_retries=0 if options.fail_fast_model else None,
+        request_timeout=45 if options.fail_fast_model else 200,
+        use_configured_url=options.fail_fast_model,
     )
     baseline_rows = {}
     first_generation = None

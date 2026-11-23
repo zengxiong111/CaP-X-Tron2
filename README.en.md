@@ -4,6 +4,8 @@ CaP-X-Tron2 runs model-generated Python with the LimX DACH_TRON2A two-finger gri
 
 [简体中文](README.md) · [Simulation guide](docs/tron2_bringup.en.md) · [Tools and frames](docs/tron2_architecture.en.md)
 
+The [TRON2 web evaluation](docs/tron2_bringup.en.md#web-workflow) provides controls for the perception server, LLM proxy setup, and Cube Lift evaluation.
+
 ## Contents
 
 - [Simulation results](#simulation-results)

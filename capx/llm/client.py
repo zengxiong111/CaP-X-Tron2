@@ -97,6 +97,9 @@ class ModelQueryArgs:
     max_tokens: int = 4096
     reasoning_effort: str = "medium"
     debug: bool = False
+    request_timeout: float = 200
+    max_server_retries: int | None = None
+    use_configured_url: bool = False
 
 
 def collapse_text_image_inputs(messages: list[dict]) -> list[dict]:
@@ -188,7 +191,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
     """
 
     # Route OpenRouter models to the OpenRouter proxy server
-    if is_openrouter_model(args.model):
+    if is_openrouter_model(args.model) and not getattr(args, "use_configured_url", False):
         server_url = OPENROUTER_SERVER_URL
     else:
         server_url = args.server_url
@@ -239,21 +242,29 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
-    elif os.getenv("OPENAI_API_KEY") is not None and args.model in GPT_MODELS:
+    elif (
+        not getattr(args, "use_configured_url", False)
+        and os.getenv("OPENAI_API_KEY") is not None
+        and args.model in GPT_MODELS
+    ):
         headers["Authorization"] = f"Bearer {os.getenv('OPENAI_API_KEY')}"
     start_time = time.time()
+    timeout = getattr(args, "request_timeout", 200)
+    retry_limit = getattr(args, "max_server_retries", None)
 
     # keep calling until it works
     response = requests.post(
-        server_url, headers=headers, data=json.dumps(payload), timeout=200
+        server_url, headers=headers, data=json.dumps(payload), timeout=timeout
     )
     retry = 1
-    while response.status_code in [404, 500, 502, 503, 504]:
+    while response.status_code in [404, 500, 502, 503, 504] and (
+        retry_limit is None or retry <= retry_limit
+    ):
         sleep_time = 240 + random.uniform(-90, 90)
         print(f"Retry {retry}. Model query failed with status code {response.status_code}. Error: {response.text}. Retrying in {sleep_time} seconds...")
         time.sleep(sleep_time)
         response = requests.post(
-            server_url, headers=headers, data=json.dumps(payload), timeout=200
+            server_url, headers=headers, data=json.dumps(payload), timeout=timeout
         )
         retry += 1
 

@@ -7,6 +7,7 @@ Use MuJoCo to replay Cube Lift, run the hand-written Oracle, and compare a live 
 ## Contents
 
 - [Runtime and official model](#setup)
+- [Web evaluation](#web-workflow)
 - [MuJoCo visual replay](#replay)
 - [Oracle baseline](#oracle)
 - [Live model comparison](#model-eval)
@@ -34,6 +35,26 @@ Use MuJoCo to replay Cube Lift, run the hand-written Oracle, and compare a live 
    git -C ../tron2-robot-description checkout --detach 9939c22e69d27653ec0ba8a505859a2903dd1a71
    export TRON2_MJCF_PATH="$PWD/../tron2-robot-description/tron2a/DACH_TRON2A/xml/robot_grasper.xml"
    ```
+
+<a id="web-workflow"></a>
+
+## Web evaluation
+
+Complete the simulation and official model setup, then build the existing CaP-X web interface with Node.js and npm. The web evaluation runs Cube Lift at tabletop world Z 0.620 m and a mounting gap of 0.450 m. [Scene and pedestal limits](tron2_calibrated_occlusion.en.md#setup-and-scope)
+
+```bash
+npm ci --prefix web-ui
+npm run build --prefix web-ui
+python -m capx.web.server --host 127.0.0.1 --port 8200
+```
+
+Open the [TRON2 evaluation page](http://127.0.0.1:8200/tron2) from the simulation computer and follow its three steps.
+
+1. Start the perception server. The TRON2 RGB-D service uses port 8121 by default. During evaluation, `get_object_pose` sends frames to this service and switches to the overview camera when needed.
+2. Enter the full URL of a running local Chat Completions endpoint and its model ID, then test the LLM connection. The page defaults to local Qwen2.5-Coder-3B-Instruct on port 18086. CaP-X's OpenRouter and vLLM servers are available as needed. [LLM proxy setup](configuration.md#adding-new-llm-providers)
+3. Choose a start seed and trial count, then run the evaluation. The page displays the latest MuJoCo frames, physical results, and LLM-generated program. Stop the evaluation to end the current trial process. Reports and images are saved to `outputs/tron2_web/` by default.
+
+The web entry runs text-feedback recovery with head-camera occlusion. The separate guide provides the paired VDM commands. [Paired text and VDM rerun](tron2_calibrated_occlusion.en.md#rerun-steps)
 
 <a id="replay"></a>
 
