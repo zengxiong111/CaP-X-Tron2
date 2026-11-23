@@ -22,7 +22,7 @@ The hand-written Cube Lift Oracle reran at **20/20** with Mock, MuJoCo ground-tr
 
 The original program omitted the lift command after closing the gripper. With explicit actions, every trial succeeded on the first turn and raised the cube center by 11.95–11.97 cm. The table counts physical success in simulation. [Evaluation criteria and runtime](docs/tron2_bringup.en.md#results)
 
-After a controlled cube shift, the ground-truth group went from **0/20** on the first turn to **20/20** after a same-scene retry. The RGB-D text and text + VDM arms each recovered **20/20**. All 20 SmolVLM descriptions missed the cube movement. [Recovery results and commands](docs/tron2_recovery.en.md)
+With a fixed +X shift, the ground-truth position, RGB-D text, and RGB-D text + SmolVLM arms all recovered from **0/20** on the first turn to **20/20**. In the paired +X and −Y evaluation, target-motion VDM identified **20/20** image directions correctly, and the text and text + VDM arms each recovered **20/20**. [Recovery results and commands](docs/tron2_recovery.en.md)
 
 ## Open the visual replay
 
