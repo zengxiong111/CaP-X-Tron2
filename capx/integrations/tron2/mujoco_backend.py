@@ -15,6 +15,14 @@ from xml.etree import ElementTree as ET
 import numpy as np
 
 from .backends import ActionResult, Arm, CameraFrame, ObservationUnavailableError, Pose, TaskState
+from .mounting import (
+    BASE_WORLD_Z,
+    MOUNT_GAP,
+    RIGHT_GRASP_QUATERNION,
+    RIGHT_READY,
+    TABLETOP_Z,
+    VENDOR_BASE_Z,
+)
 from .safety import validate_arm, validate_move
 
 _ARMS: dict[Arm, str] = {"left": "L", "right": "R"}
@@ -31,14 +39,15 @@ _SPAWN_MIN = (.343, -.214)
 _SPAWN_MAX = (.385, -.178)
 _IDENTITY = (1.0, 0.0, 0.0, 0.0)
 _TOP_DOWN = {
-    arm: (math.sqrt(.5), 0.0, 0.0, yaw * math.sqrt(.5))
-    for arm, yaw in (("left", -1), ("right", 1))
+    "left": (math.sqrt(.5), 0.0, 0.0, -math.sqrt(.5)),
+    "right": RIGHT_GRASP_QUATERNION,
 }
 _TCP_OFFSET = (0.0, 0.0, -0.168)
 _WIDTH, _HEIGHT = 480, 360
 _MAX_MOTION_SECONDS = 8.0
 _MAX_JOINT_SPEED = 0.85
 _MOTION_SETTLE_SECONDS = 0.14
+_MOUNTED_BASE_Z = BASE_WORLD_Z
 
 
 def _xml_vector(values: tuple[float, ...]) -> str:
@@ -55,6 +64,34 @@ def _scene(path: Path) -> str:
     if compiler is None or world is None or base is None or option is None or contacts is None:
         raise ValueError("Expected the LimX DACH_TRON2A robot_grasper.xml model.")
     compiler.set("meshdir", str((path.parent / compiler.get("meshdir", ".")).resolve()))
+    base_xyz = [float(value) for value in base.get("pos", "").split()]
+    if len(base_xyz) != 3 or not (np.isclose(base_xyz[2], VENDOR_BASE_Z, atol=1e-9, rtol=0)
+                                  or np.isclose(base_xyz[2], _MOUNTED_BASE_Z, atol=1e-9, rtol=0)):
+        raise ValueError("The vendor base must be at Z=1.210 m or the calibrated Z=1.070 m.")
+    base_xyz[2] = _MOUNTED_BASE_Z  # Normalize exactly once, including calibrated overlays.
+    base.set("pos", _xml_vector(tuple(base_xyz)))
+    # The vendor stand mesh extends ~0.13035 m below this datum. Preserve all
+    # link transforms and represent the simulated recess in collision and RGB.
+    ground = world.find("geom[@name='ground']")
+    if ground is None:
+        raise ValueError("The vendor model must include its ground geom.")
+    world.remove(ground)
+    # Keep tiles finite (4 x 4 m) so MuJoCo's inferred camera clipping planes
+    # remain appropriate for the tabletop scene.
+    _mount_box(world, "ground", (-1.19, 0, -.02), (.81, 2, .02), ".2 .3 .4 1")
+    _mount_box(world, "mount_floor_east", (1.19, 0, -.02), (.81, 2, .02), ".2 .3 .4 1")
+    _mount_box(world, "mount_floor_north", (0, 1.19, -.02), (.38, .81, .02), ".2 .3 .4 1")
+    _mount_box(world, "mount_floor_south", (0, -1.19, -.02), (.38, .81, .02), ".2 .3 .4 1")
+    # 760 x 760 mm aperture around the vendor foot and a rendered, collidable
+    # support plate. Its top is 1 mm above the measured stand minimum (-.13035).
+    _mount_box(world, "mount_recess_floor", (0, 0, -.13435), (.365, .365, .005), ".3 .32 .34 1")
+    for name, pos, size in (
+        ("left_wall", (-.38, 0, -.070175), (.01, .38, .070175)),
+        ("right_wall", (.38, 0, -.070175), (.01, .38, .070175)),
+        ("front_wall", (0, -.38, -.070175), (.38, .01, .070175)),
+        ("back_wall", (0, .38, -.070175), (.38, .01, .070175)),
+    ):
+        _mount_box(world, "mount_recess_" + name, pos, size, ".32 .34 .36 1")
     free_base = base.find("joint[@type='free']")
     if free_base is not None:
         base.remove(free_base)
@@ -126,6 +163,13 @@ def _scene(path: Path) -> str:
     return ET.tostring(root, encoding="unicode")
 
 
+def _mount_box(world: ET.Element, name: str, pos: tuple[float, float, float],
+               half_size: tuple[float, float, float], rgba: str) -> None:
+    ET.SubElement(world, "geom", name=name, type="box", pos=_xml_vector(pos),
+                  size=_xml_vector(half_size), rgba=rgba, contype="1", conaffinity="1",
+                  condim="3", friction="1 .3 .3", margin=".001")
+
+
 class MujocoBackend:
     """In-process physics backend that never connects to a robot controller."""
 
@@ -154,14 +198,18 @@ class MujocoBackend:
         self._renderer = None
         self._closed = False
         self._base_pos = model.body("base_Link").pos.copy()
+        table = model.geom("task_table")
         if not np.allclose(model.body("base_Link").quat, _IDENTITY) or model.body(
             "base_Link"
         ).parentid[0] != 0:
             raise ValueError("The external DACH base must be fixed and aligned with the world.")
+        tabletop_z = table.pos[2] + table.size[2]
+        if not np.allclose((tabletop_z, self._base_pos[2] - tabletop_z),
+                           (TABLETOP_Z, MOUNT_GAP), atol=1e-9, rtol=0):
+            raise ValueError("The MuJoCo scene must use tabletop Z=0.620 m and mount gap=0.450 m.")
         self._cube_joint = int(model.joint("task_cube").qposadr[0])
         self._cube_dof = int(model.joint("task_cube").dofadr[0])
         cube = model.geom("task_cube")
-        table = model.geom("task_table")
         self._cube_geom = cube.id
         goal = model.site("task_goal").pos.copy()
         goal[2] = table.pos[2] + table.size[2] + cube.size[2]
@@ -169,14 +217,21 @@ class MujocoBackend:
         self._actor_geoms = {
             geom.id for i in range(model.ngeom) if model.geom_contype[i] != 0
             and (geom := model.geom(i)).name not in {
-                "ground", "task_table", "task_cube", "task_distractor"
+                "ground", "mount_floor_east", "mount_floor_north", "mount_floor_south",
+                "mount_recess_floor", "mount_recess_left_wall", "mount_recess_right_wall",
+                "mount_recess_front_wall", "mount_recess_back_wall",
+                "task_table", "task_cube", "task_distractor"
             }
         }
         self._base_geoms = {
             geom for geom in self._actor_geoms
             if model.geom_bodyid[geom] in {model.body("base_3_Link").id, model.body("base_2_Link").id}
         }
-        self._ground = model.geom("ground").id
+        self._ground_geoms = {model.geom(name).id for name in (
+            "ground", "mount_floor_east", "mount_floor_north", "mount_floor_south",
+            "mount_recess_floor", "mount_recess_left_wall", "mount_recess_right_wall",
+            "mount_recess_front_wall", "mount_recess_back_wall",
+        )}
         self._jaws = {
             arm: frozenset(model.geom(f"grasper_{suffix}_jaw_{jaw}_Link").id
                            for jaw in ("left", "right"))
@@ -231,6 +286,14 @@ class MujocoBackend:
         mj.mj_forward(model, data)
         for arm, side in (("left", 1), ("right", -1)):
             ids = self._arm_actuators[arm]
+            if arm == "right":
+                q = RIGHT_READY.copy()
+                if np.any(self._limits[ids, 0] >= q) or np.any(self._limits[ids, 1] <= q):
+                    raise RuntimeError("The fixed-gap right-arm ready pose exceeds joint limits.")
+                self._targets[ids] = q
+                data.qpos[self._joint_qpos[ids]] = q
+                mj.mj_forward(model, data)
+                continue
             home = np.array((.31, side * .246, -.444, *_TOP_DOWN[arm]))
             guess = np.array((-.6, side * .1, 0, -.2, 0, .65, 0))
             q = self._inverse_kinematics(arm, home, guess)
@@ -382,7 +445,9 @@ class MujocoBackend:
                 continue
             if self._cube_geom in (a, b) and any(a in jaws or b in jaws for jaws in self._jaws.values()):
                 continue
-            if self._ground in (a, b) and (a in self._base_geoms or b in self._base_geoms):
+            if (a in self._ground_geoms or b in self._ground_geoms) and (
+                a in self._base_geoms or b in self._base_geoms
+            ):
                 continue
             return f"{self._model.geom(a).name or self._model.body(self._model.geom_bodyid[a]).name} " \
                    f"and {self._model.geom(b).name or self._model.body(self._model.geom_bodyid[b]).name}"

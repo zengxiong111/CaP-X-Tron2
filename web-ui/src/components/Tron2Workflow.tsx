@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 
 type Camera = 'overview' | 'before' | 'after';
+type Task = 'cube_lift' | 'pick_place';
+type Feedback = 'oracle' | 'single' | 'text' | 'vdm';
 
 interface Evaluation {
   state: 'running' | 'complete' | 'stopped' | 'error';
   completed: number;
   total: number;
   successes: number;
+  task: Task;
+  stage: Feedback | 'baseline';
+  baseline_successes: number | null;
+  visual_directions: number | null;
   error: string | null;
   latest: {
     seed: number;
@@ -37,6 +43,15 @@ const runLabels = {
   error: '运行失败',
 };
 
+const taskLabels: Record<Task, string> = { cube_lift: 'Cube Lift', pick_place: 'Pick & Place' };
+const stageLabels: Record<Evaluation['stage'], string> = {
+  oracle: 'Oracle',
+  single: '单轮',
+  text: '多轮文本',
+  baseline: '配对文本基线',
+  vdm: '文本 + VDM',
+};
+
 const secondary = 'rounded-md border border-surface-border-light px-3 py-2 text-sm text-text-primary hover:bg-surface-overlay disabled:opacity-45';
 const primary = 'rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black hover:bg-accent-light disabled:opacity-40';
 const field = 'mt-1.5 w-full rounded-md border border-surface-border-light bg-surface-sunken px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none';
@@ -60,6 +75,9 @@ export function Tron2Workflow() {
   const [model, setModel] = useState('Qwen/Qwen2.5-Coder-3B-Instruct');
   const [seed, setSeed] = useState('41');
   const [trials, setTrials] = useState('1');
+  const [task, setTask] = useState<Task>('cube_lift');
+  const [feedback, setFeedback] = useState<Feedback>('text');
+  const [occlusion, setOcclusion] = useState(true);
   const [camera, setCamera] = useState<Camera>('overview');
   const [pending, setPending] = useState('');
   const [error, setError] = useState('');
@@ -125,7 +143,7 @@ export function Tron2Workflow() {
       </header>
 
       <main className="mx-auto max-w-7xl px-5 pb-12 pt-8 sm:px-8 lg:pt-12">
-        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">TRON2 Cube Lift</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">TRON2 {taskLabels[task]}</h1>
         <p className="mt-2 text-sm text-text-secondary">桌面世界 Z 0.620 m · 安装高差 0.450 m</p>
         <div className="mt-8 grid items-start gap-7 lg:grid-cols-[minmax(290px,340px)_1fr]">
           <div className="divide-y divide-surface-border rounded-lg border border-surface-border bg-surface-raised">
@@ -176,6 +194,28 @@ export function Tron2Workflow() {
 
             <section className="space-y-3 p-5" aria-labelledby="evaluation-heading">
               <h2 id="evaluation-heading" className="font-semibold">3. 运行评估</h2>
+              <div>
+                <label htmlFor="tron2-task" className="block text-sm text-text-secondary">任务</label>
+                <select id="tron2-task" className={field} value={task} disabled={running || Boolean(pending)}
+                  onChange={(event) => setTask(event.target.value as Task)}>
+                  <option value="cube_lift">Cube Lift</option>
+                  <option value="pick_place">Pick &amp; Place</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="tron2-feedback" className="block text-sm text-text-secondary">反馈方式</label>
+                <select id="tron2-feedback" className={field} value={feedback} disabled={running || Boolean(pending)}
+                  onChange={(event) => setFeedback(event.target.value as Feedback)}>
+                  <option value="single">单轮</option>
+                  <option value="text">多轮文本</option>
+                  <option value="vdm">多轮文本与 VDM 配对</option>
+                  <option value="oracle">Oracle</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
+                <input type="checkbox" checked={occlusion} disabled={running || Boolean(pending)}
+                  onChange={(event) => setOcclusion(event.target.checked)} /> 头部相机部分遮挡
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="text-sm text-text-secondary">
                   起始种子
@@ -192,11 +232,11 @@ export function Tron2Workflow() {
                 <button className={secondary} disabled={Boolean(pending)}
                   onClick={() => changeProcess('/evaluation/stop')}>停止评估</button>
               ) : (
-                <button className={primary} disabled={!status?.perception || !settingsReady || Boolean(pending) || !seed || !trials}
+                <button className={primary} disabled={!status?.perception || (!settingsReady && feedback !== 'oracle') || Boolean(pending) || !seed || !trials}
                   onClick={() => update('evaluation', async () => {
                     setCamera('overview');
                     setStatus(await fetchJson<Status>('/evaluation/start', {
-                      ...options, start_seed: Number(seed), trials: Number(trials),
+                      ...options, task, feedback, occlusion, start_seed: Number(seed), trials: Number(trials),
                     }));
                   })}>运行评估</button>
               )}
@@ -208,7 +248,7 @@ export function Tron2Workflow() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-5 py-4">
               <h2 id="view-heading" className="font-semibold">MuJoCo 评估画面</h2>
               {run && <span role="status" className="text-sm text-text-secondary">
-                {runLabels[run.state]} · {run.completed}/{run.total} 已运行 · {run.successes} 成功
+                {taskLabels[run.task]} · {stageLabels[run.stage]} · {runLabels[run.state]} · {run.completed}/{run.total} 已运行 · {run.successes} 成功
               </span>}
             </div>
             <div className="relative flex aspect-[4/3] max-h-[540px] items-center justify-center bg-surface-sunken">
@@ -216,12 +256,18 @@ export function Tron2Workflow() {
                 <img src={latest.frames[camera]} alt={cameraLabels[camera]} className="absolute inset-0 h-full w-full object-contain" />
               ) : (
                 <p className="px-4 text-center text-sm text-text-secondary">
-                  {running ? '正在生成并执行程序，首个试验结束后显示画面。' : '运行 Cube Lift 后在这里查看仿真画面。'}
+                  {running ? '正在生成并执行程序，首个试验结束后显示画面。' : '运行评估后在这里查看仿真画面。'}
                 </p>
               )}
             </div>
             {latest && (
               <div className="space-y-4 p-5">
+                {run && run.baseline_successes !== null && (
+                  <p className="text-sm text-text-secondary">
+                    文本基线 {run.baseline_successes}/{run.total}
+                    {run.visual_directions !== null && ` · VDM 方向判对 ${run.visual_directions} 次`}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(cameraLabels) as Camera[]).map((name) => (
                     <button key={name} className={`${secondary} ${camera === name ? 'border-accent text-accent' : ''}`}

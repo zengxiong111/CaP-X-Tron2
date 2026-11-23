@@ -5,6 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from .backends import CameraFrame, ObservationUnavailableError, Pose
+from .mounting import BASE_WORLD_Z, VENDOR_BASE_Z
+
+# Perception crop coordinates were calibrated against the vendor base datum.
+# The shared scene places the physical base 0.140 m lower while holding the
+# table fixed, so transform points back into that calibrated crop frame.
+WORKSPACE_Z_OFFSET = VENDOR_BASE_Z - BASE_WORLD_Z
 
 # Crop in robot_base using the bounds of the calibrated fixed tabletop scene.
 _WORKSPACE_MIN = np.array([0.20, -0.37, -0.603])

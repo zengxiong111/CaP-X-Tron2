@@ -4,16 +4,53 @@ CaP-X-Tron2 runs model-generated Python with the LimX DACH_TRON2A two-finger gri
 
 [简体中文](README.md) · [Simulation guide](docs/tron2_bringup.en.md) · [Tools and frames](docs/tron2_architecture.en.md)
 
-The [TRON2 web evaluation](docs/tron2_bringup.en.md#web-workflow) provides controls for the perception server, LLM proxy setup, and Cube Lift evaluation.
+The [TRON2 web evaluation](docs/tron2_bringup.en.md#web-workflow) provides controls for the perception server, LLM proxy setup, and evaluation for Cube Lift and Pick & Place.
 
 ## Contents
 
+- [Quick start](#quick-start)
 - [Simulation results](#simulation-results)
 - [Open the visual replay](#open-the-visual-replay)
 - [Setup and evaluation](#setup-and-evaluation)
 - [Upstream project](#upstream-project)
 
+## Quick start
+
+Install the TRON2 simulation dependencies and set `TRON2_MJCF_PATH`. Run from the repository root, with the first two steps in separate terminals. The Web UI's `/tron2` page also supports service checks and evaluation. [Runtime setup](docs/tron2_bringup.en.md#setup) · [Web evaluation](docs/tron2_bringup.en.md#web-workflow)
+
+1. Start the TRON2 RGB-D perception service.
+
+   ```bash
+   python -m capx.serving.launch_tron2_rgbd_server --port 8121
+   ```
+
+2. Start an OpenAI-compatible LLM service. You can reuse an existing local service. The command below uses a model environment with vLLM installed. [Install vLLM](https://docs.vllm.ai/en/latest/getting_started/installation/)
+
+   ```bash
+   python -m capx.serving.vllm_server \
+     --model Qwen/Qwen2.5-Coder-3B-Instruct \
+     --revision 488639f1ff808d1d3d0ba301aef8c11461451ec5 \
+     --host 127.0.0.1 --port 18086 --max-model-len 4096
+   ```
+
+3. Run one seed of Cube Lift recovery evaluation. Choose a new output path for reruns.
+
+   ```bash
+   export MUJOCO_GL=egl
+   python -m capx.envs.evaluate_tron2_recovery \
+     --config env_configs/tron2/cube_lift_s2_guided.yaml \
+     --model Qwen/Qwen2.5-Coder-3B-Instruct \
+     --server-url http://127.0.0.1:18086/v1/chat/completions \
+     --perception-url http://127.0.0.1:8121 \
+     --start-seed 41 --trials 1 --offset-directions '+X,-Y' \
+     --output outputs/tron2_smoke/text.json
+   ```
+
 ## Simulation results
+
+On the current fixed mounting scene, Qwen with multi-turn text feedback achieved **20/20** on both tasks. With VDM, Cube Lift reached **20/20** and Pick & Place **11/20**. [Paired protocol and results](docs/tron2_benchmark.en.md#current-results)
+
+The published results below precede the unified pedestal. The standard experiments used a 0.590 m gap, and the occlusion experiment used a separate temporary layout with a 0.450 m gap. [Scene and rerun details](docs/tron2_bringup.en.md#results)
 
 The hand-written Cube Lift Oracle reran at **20/20** with Mock, MuJoCo ground-truth poses, and RGB-D. The actual Qwen2.5-Coder-3B-Instruct evaluation used the same 20 seeds for each condition.
 

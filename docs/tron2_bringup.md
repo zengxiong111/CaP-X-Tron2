@@ -41,7 +41,7 @@
 
 ## Web 评估
 
-完成仿真环境和官方模型设置后，使用 Node.js 和 npm 构建现有 CaP-X Web 界面。Web 评估使用桌面世界 Z 0.620 m、安装高差 0.450 m 的 Cube Lift 场景。 [场景与支座限制](tron2_calibrated_occlusion.md#配置与边界)
+完成仿真环境和官方模型设置后，使用 Node.js 和 npm 构建现有 CaP-X Web 界面。Web 和 CLI 使用同一固定安装场景，桌面世界 Z 为 0.620 m，安装高差为 0.450 m。 [场景与基准](tron2_benchmark.md#配置)
 
 ```bash
 npm ci --prefix web-ui
@@ -53,9 +53,9 @@ python -m capx.web.server --host 127.0.0.1 --port 8200
 
 1. 点击 **启动感知服务器**。TRON2 RGB-D 服务默认使用 8121 端口。评估中的 `get_object_pose` 会把相机帧发送给该服务，必要时切换到 overview 相机。
 2. 在 **设置 LLM 代理** 填入已运行的本地 Chat Completions 完整地址与模型 ID，点击 **测试 LLM 连接**。页面默认填写本地 Qwen2.5-Coder-3B-Instruct 和 18086 端口。可按需要使用 CaP-X 的 OpenRouter 或 vLLM 服务。 [LLM 代理设置](configuration.md#adding-new-llm-providers)
-3. 选择起始种子与试验数，点击 **运行评估**。页面显示最新试验的 MuJoCo 画面、物理判分和 LLM 生成程序。**停止评估**结束当前试验进程。评估报告与图像默认写入 `outputs/tron2_web/`。
+3. 选择任务、反馈方式、起始种子与试验数，点击 **运行评估**。选择配对 VDM 时，页面先运行文本基线，再核对并运行 VDM 组。页面显示 MuJoCo 画面、物理判分和生成程序。**停止评估**结束已启动的试验进程。报告与图像默认写入 `outputs/tron2_web/`。
 
-Web 入口运行带头部相机遮挡的文本反馈恢复评估。配对 VDM 评测命令见独立指南。 [文本与 VDM 配对复跑](tron2_calibrated_occlusion.md#复跑步骤)
+任务菜单提供 Cube Lift 和 Pick & Place。可选择头部相机部分遮挡。选择 Oracle 时可以跳过 LLM 配置。 [CLI 配对基准](tron2_benchmark.md#运行方法)
 
 <a id="replay"></a>
 
@@ -67,11 +67,18 @@ Web 入口运行带头部相机遮挡的文本反馈恢复评估。配对 VDM �
 MUJOCO_GL=glfw python -m capx.envs.replay_tron2_cube_lift
 ```
 
+启动感知服务后，可用同一评测 YAML 回放 Pick & Place 的 Oracle。使用 `--program` 可改为执行保存的 Python 程序。图形回放使用单轮、无扰动场景。
+
+```bash
+MUJOCO_GL=glfw python -m capx.envs.replay_tron2_cube_lift \
+  --config env_configs/tron2/pick_place_s2_guided.yaml --oracle --seed 41
+```
+
 <a id="oracle"></a>
 
 ## Oracle 基线
 
-Cube Lift 的三份配置分别使用 Mock、仿真真值位姿和 RGB-D 估计。S2 需要可用的渲染环境，Linux 的启动器默认使用 EGL。运行 Pick & Place 时将配置文件名中的 `cube_lift` 换成 `pick_place`。
+Cube Lift 的三份配置分别使用 Mock、仿真真值位姿和 RGB-D 估计。S2 通过 YAML 的 `api_servers` 自动启动或复用本机感知服务。Linux 启动器默认使用 EGL。运行 Pick & Place 时将配置文件名中的 `cube_lift` 换成 `pick_place`。
 
 ```bash
 for mode in mock s1 s2; do
@@ -104,6 +111,8 @@ done
 <a id="5-验收记录"></a>
 
 ## 验收结果
+
+下表是支座统一前使用 0.590 m 高差的历史记录。当前固定安装布局的验证单独记录。 [固定安装基准](tron2_benchmark.md)
 
 | 评测 | 结果 |
 | --- | --- |

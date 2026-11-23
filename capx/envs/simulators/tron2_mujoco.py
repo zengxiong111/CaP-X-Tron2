@@ -60,6 +60,8 @@ class Tron2MujocoEnv(BaseEnv):
         privileged: bool = False,
         enable_render: bool = False,
         visual_pose: bool = False,
+        perception_url: str | None = None,
+        perception_timeout_s: float = 5.0,
         viser_debug: bool = False,
     ) -> None:
         super().__init__()
@@ -71,6 +73,8 @@ class Tron2MujocoEnv(BaseEnv):
             raise ValueError("max_attempts must be a positive integer")
         if not isfinite(max_seconds) or max_seconds <= 0:
             raise ValueError("max_seconds must be positive and finite")
+        if not isfinite(perception_timeout_s) or perception_timeout_s <= 0:
+            raise ValueError("perception_timeout_s must be positive and finite")
         if viser_debug:
             raise ValueError("TRON2 does not support viser_debug")
         if visual_pose:
@@ -90,6 +94,8 @@ class Tron2MujocoEnv(BaseEnv):
         self.privileged = privileged
         self.enable_render = enable_render
         self.visual_pose = visual_pose
+        self.perception_url = perception_url
+        self.perception_timeout_s = perception_timeout_s
 
         if isinstance(backend, str):
             if backend == "mujoco":
@@ -109,6 +115,7 @@ class Tron2MujocoEnv(BaseEnv):
         self._initial_state: TaskState | None = None
         self._target_pose: Pose | None = None
         self._sim_step_count = 0
+        self.pose_estimate_calls = 0
         self._attempts = 0
         self._attempt_start = 0
         self._previous_attempt_start = 0
@@ -128,6 +135,7 @@ class Tron2MujocoEnv(BaseEnv):
             self._backend.get_object_pose("target") if self.task == "pick_place" else None
         )
         self._sim_step_count = 0
+        self.pose_estimate_calls = 0
         self._attempts = 0
         self._attempt_start = 0
         self._previous_attempt_start = 0
@@ -196,9 +204,19 @@ class Tron2MujocoEnv(BaseEnv):
                 ) from overview_error
 
     def _estimate_pose(self, frame: CameraFrame, name: str) -> Pose:
-        from capx.integrations.tron2.perception import estimate_tabletop_pose
+        from capx.integrations.tron2.perception import WORKSPACE_Z_OFFSET, estimate_tabletop_pose
 
-        return estimate_tabletop_pose(frame, name)
+        self.pose_estimate_calls += 1
+        if self.perception_url:
+            from capx.integrations.tron2.perception_service import request_pose
+
+            return request_pose(
+                self.perception_url, frame, name, workspace_z_offset=WORKSPACE_Z_OFFSET,
+                timeout=self.perception_timeout_s,
+            )
+        return estimate_tabletop_pose(
+            frame, name, workspace_z_offset=WORKSPACE_Z_OFFSET
+        )
 
     def get_image(self, camera_name: str) -> CameraFrame:
         self._require_reset()

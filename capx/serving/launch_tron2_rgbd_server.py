@@ -46,11 +46,20 @@ async def pose(request: Request, name: str, workspace_z_offset: float = Query(0.
     return await run_in_threadpool(estimate, payload, name, workspace_z_offset)
 
 
-def main():
+def serve(port: int = 8121, host: str = "127.0.0.1"):
+    """Run the RGB-D service; usable by both YAML launchers and the CLI."""
+    uvicorn.run(app, host=host, port=port, log_level="warning")
+
+
+def main(port: int | None = None, host: str | None = None):
+    if port is not None:
+        serve(port=port, host=host or "127.0.0.1")
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8121)
+    parser.add_argument("--host", default="127.0.0.1")
     options = parser.parse_args()
-    uvicorn.run(app, host="127.0.0.1", port=options.port, log_level="warning")
+    serve(port=options.port, host=options.host)
 
 
 if __name__ == "__main__":

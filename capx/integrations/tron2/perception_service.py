@@ -13,7 +13,14 @@ SERVICE_NAME = "tron2-rgbd"
 FRAME_FIELDS = ("rgb", "depth", "K", "T_base_camera")
 
 
-def request_pose(url: str, frame: CameraFrame, name: str, workspace_z_offset: float) -> Pose:
+def request_pose(
+    url: str,
+    frame: CameraFrame,
+    name: str,
+    workspace_z_offset: float = 0.0,
+    *,
+    timeout: float = 5.0,
+) -> Pose:
     with BytesIO() as stream:
         np.savez(stream, **{key: frame[key] for key in FRAME_FIELDS})
         try:
@@ -22,7 +29,7 @@ def request_pose(url: str, frame: CameraFrame, name: str, workspace_z_offset: fl
                 params={"workspace_z_offset": workspace_z_offset},
                 headers={"Content-Type": "application/octet-stream"},
                 data=stream.getvalue(),
-                timeout=5,
+                timeout=timeout,
             )
             if response.status_code == 422:
                 raise ObservationUnavailableError(response.json()["detail"])

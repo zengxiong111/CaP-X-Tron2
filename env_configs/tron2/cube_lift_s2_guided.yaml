@@ -1,0 +1,45 @@
+# Guided Cube Lift with the RGB-D pose service used by the S2 profile.
+env:
+  _target_: capx.envs.tasks.tron2.cube_lift.Tron2CubeLiftCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: cube_lift
+      backend: mujoco
+      privileged: false
+      enable_render: true
+      visual_pose: true
+      perception_url: http://127.0.0.1:8121
+      perception_timeout_s: 5.0
+      max_attempts: 1
+    apis: [Tron2ControlApi]
+    prompt: |-
+      Write straight-line Python to lift the cube. No loops. No sleeps. No imports. Stop on any failed tool call.
+      Read x, y, z from get_object_pose("cube")[:3]. Read q from get_robot_state()["grasp_quaternions"]["right"].
+      Use these five actions in this order:
+      - open_gripper("right")
+      - move_ee("right", [x, y, z + 0.09, *q])
+      - move_ee("right", [x, y, z, *q])
+      - close_gripper("right")
+      - move_ee("right", [x, y, z + 0.12, *q])
+      The last move must occur after close_gripper and the gripper must remain closed. For each tool call, assert that the returned dict has success=True. After the last move, check get_object_pose("cube")[2] >= z + 0.07. This Python is executed at module scope. Never use a return statement. Print the final cube pose. Output only one fenced Python code block.
+    multi_turn_prompt: |
+      Executed code:
+      {executed_code}
+      Console output and TRON2 episode feedback:
+      {console_stdout}
+      Execution errors:
+      {console_stderr}
+      Re-observe the cube through get_object_pose before retrying. A pose estimate can fail if the cube is occluded.
+
+use_visual_feedback: true
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/cube_lift_s2_guided
+trials: 20
+num_workers: 1
+api_servers:
+  - _target_: capx.serving.launch_tron2_rgbd_server.main
+    host: 127.0.0.1
+    port: 8121

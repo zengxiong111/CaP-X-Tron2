@@ -40,7 +40,7 @@ Use MuJoCo to replay Cube Lift, run the hand-written Oracle, and compare a live 
 
 ## Web evaluation
 
-Complete the simulation and official model setup, then build the existing CaP-X web interface with Node.js and npm. The web evaluation runs Cube Lift at tabletop world Z 0.620 m and a mounting gap of 0.450 m. [Scene and pedestal limits](tron2_calibrated_occlusion.en.md#setup-and-scope)
+Complete the simulation and official model setup, then build the existing CaP-X web interface with Node.js and npm. Web and CLI evaluation share a fixed mounting scene with tabletop world Z = 0.620 m and a 0.450 m mounting gap. [Scene and benchmark](tron2_benchmark.en.md#configuration)
 
 ```bash
 npm ci --prefix web-ui
@@ -52,9 +52,9 @@ Open the [TRON2 evaluation page](http://127.0.0.1:8200/tron2) from the simulatio
 
 1. Start the perception server. The TRON2 RGB-D service uses port 8121 by default. During evaluation, `get_object_pose` sends frames to this service and switches to the overview camera when needed.
 2. Enter the full URL of a running local Chat Completions endpoint and its model ID, then test the LLM connection. The page defaults to local Qwen2.5-Coder-3B-Instruct on port 18086. CaP-X's OpenRouter and vLLM servers are available as needed. [LLM proxy setup](configuration.md#adding-new-llm-providers)
-3. Choose a start seed and trial count, then run the evaluation. The page displays the latest MuJoCo frames, physical results, and LLM-generated program. Stop the evaluation to end the current trial process. Reports and images are saved to `outputs/tron2_web/` by default.
+3. Choose the task, feedback mode, start seed, and trial count, then run the evaluation. Paired VDM runs the text baseline first, then verifies and runs the VDM arm. The page displays MuJoCo frames, physical results, and the generated program. Stop the evaluation to end the active trial process. Reports and images are saved to `outputs/tron2_web/` by default.
 
-The web entry runs text-feedback recovery with head-camera occlusion. The separate guide provides the paired VDM commands. [Paired text and VDM rerun](tron2_calibrated_occlusion.en.md#rerun-steps)
+The task menu offers Cube Lift and Pick & Place. Partial head-camera occlusion is optional. Oracle mode can skip the LLM setup. [CLI paired benchmark](tron2_benchmark.en.md#run-the-benchmark)
 
 <a id="replay"></a>
 
@@ -66,11 +66,18 @@ On a Linux desktop with MuJoCo 3.17.0, replay the validated seed 1. The viewer e
 MUJOCO_GL=glfw python -m capx.envs.replay_tron2_cube_lift
 ```
 
+After starting the perception service, replay the Pick & Place Oracle with the same evaluation YAML. Use `--program` to run a saved Python program. The viewer runs a single turn without a disturbance.
+
+```bash
+MUJOCO_GL=glfw python -m capx.envs.replay_tron2_cube_lift \
+  --config env_configs/tron2/pick_place_s2_guided.yaml --oracle --seed 41
+```
+
 <a id="oracle"></a>
 
 ## Oracle baseline
 
-The three Cube Lift configurations use Mock, simulation ground-truth poses, and RGB-D estimates. S2 needs a working rendering backend. The Linux launcher defaults to EGL. For Pick & Place, replace `cube_lift` with `pick_place` in the config name.
+The three Cube Lift configurations use Mock, simulation ground-truth poses, and RGB-D estimates. S2 uses the YAML's `api_servers` to start or reuse the local perception service. The Linux launcher defaults to EGL. For Pick & Place, replace `cube_lift` with `pick_place` in the config name.
 
 ```bash
 for mode in mock s1 s2; do
@@ -102,6 +109,8 @@ All four configurations use seeds 1–20 and simulation ground-truth poses. For 
 <a id="results"></a>
 
 ## Validation results
+
+The table below records the 0.590 m layout before the shared pedestal. Validation of the current mounted scene is recorded separately. [Fixed-mount benchmark](tron2_benchmark.en.md)
 
 | Evaluation | Result |
 | --- | --- |

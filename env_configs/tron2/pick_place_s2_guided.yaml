@@ -1,0 +1,51 @@
+# Guided Pick & Place with the shared RGB-D pose service.
+env:
+  _target_: capx.envs.tasks.tron2.pick_place.Tron2PickPlaceCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level:
+      _target_: capx.envs.simulators.tron2_mujoco.Tron2MujocoEnv
+      task: pick_place
+      backend: mujoco
+      privileged: false
+      enable_render: true
+      visual_pose: true
+      perception_url: http://127.0.0.1:8121
+      perception_timeout_s: 5.0
+    apis: [Tron2ControlApi]
+    prompt: |-
+      Write a compact straight-line Python program to put the cube on the target. No imports, loops, sleeps or try blocks. Use only get_object_pose, get_robot_state, open_gripper, close_gripper and move_ee.
+      Read x, y, z from get_object_pose("cube")[:3], tx, ty, tz from get_object_pose("target")[:3], and q from get_robot_state()["grasp_quaternions"]["right"]. Use those variables for all coordinates and orientations.
+      Execute these five calls in order, asserting the returned success after each:
+      - open_gripper("right")
+      - move_ee("right", [x, y, z + 0.09, *q])
+      - move_ee("right", [x, y, z, *q])
+      - close_gripper("right")
+      - move_ee("right", [x, y, z + 0.12, *q])
+      Then read lifted = get_object_pose("cube") and tcp = get_robot_state()["tcp_poses"]["right"].
+      Compute dx = tcp[0] - lifted[0], dy = tcp[1] - lifted[1], and dz = tcp[2] - lifted[2]. Set release_z = tz + dz + 0.01 and transfer_z = max(tcp[2], release_z + 0.09).
+      Finish with these four calls in order, asserting success on each:
+      - move_ee("right", [tx + dx, ty + dy, transfer_z, *q])
+      - move_ee("right", [tx + dx, ty + dy, release_z, *q])
+      - open_gripper("right")
+      - move_ee("right", [tx + dx, ty + dy, transfer_z, *q])
+      Use assert result["success"], result for each tool result. Python runs at module scope. Output only one fenced Python code block.
+    multi_turn_prompt: |
+      Executed code:
+      {executed_code}
+      Console output and TRON2 episode feedback:
+      {console_stdout}
+      Execution errors:
+      {console_stderr}
+      Re-observe the cube and target through get_object_pose before retrying. A pose estimate can fail if the cube is occluded.
+
+use_visual_feedback: true
+record_video: false
+save_multiturn_prompts: true
+output_dir: ./outputs/tron2/pick_place_s2_guided
+trials: 20
+num_workers: 1
+api_servers:
+  - _target_: capx.serving.launch_tron2_rgbd_server.main
+    host: 127.0.0.1
+    port: 8121

@@ -16,13 +16,15 @@ from capx.utils.launch_utils import _load_config
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "env_configs" / "tron2"
 
 
-def build_trial(name, output_dir, *, oracle):
+def build_trial(name, output_dir, *, oracle, in_process_pose=False):
     args = LaunchArgs(
         config_path=str(CONFIG_DIR / f"{name}.yaml"),
         output_dir=str(output_dir),
         use_oracle_code=oracle,
     )
     env_factory, config, _ = _load_config(args)
+    if in_process_pose:
+        env_factory["cfg"]["low_level"].pop("perception_url", None)
     return instantiate(env_factory), args, config, env_factory["cfg"]["multi_turn_prompt"]
 
 
@@ -112,7 +114,9 @@ def test_mujoco_s2_estimates_pose_and_solves_task(tmp_path):
     pytest.importorskip("mujoco")
     from math import dist
 
-    env, args, config, prompt = build_trial("pick_place_s2", tmp_path, oracle=True)
+    env, args, config, prompt = build_trial(
+        "pick_place_s2", tmp_path, oracle=True, in_process_pose=True
+    )
     privileged = Tron2MujocoEnv(privileged=True)
     try:
         visuals, _ = env.reset(seed=1)

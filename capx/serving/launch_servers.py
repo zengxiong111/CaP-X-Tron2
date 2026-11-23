@@ -47,6 +47,13 @@ logger = logging.getLogger("launch_servers")
 # The "target" field corresponds to the ``_target_`` values found in YAML
 # configs (minus the trailing ``.main``).
 SERVER_REGISTRY: dict[str, dict[str, Any]] = {
+    "tron2_rgbd": {
+        "target": "capx.serving.launch_tron2_rgbd_server",
+        "default_port": 8121,
+        "gpu_required": False,
+        "gpu_memory_mb": 0,
+        "extra_args": {},
+    },
     "sam3": {
         "target": "capx.serving.launch_sam3_server",
         "default_port": 8114,

@@ -13,21 +13,17 @@ import numpy as np
 from PIL import Image
 
 from capx.envs import evaluate_tron2_recovery as evaluation
-from capx.integrations.tron2 import perception
 from capx.integrations.tron2.backends import ObservationUnavailableError
 from capx.integrations.tron2.calibrated_recovery import (
     EXPERIMENT_BASE_Z,
     HEAD_PATCHES,
     MOUNT_GAP,
     TABLETOP_Z,
-    VENDOR_BASE_Z,
     CalibratedRecoveryBackend,
     write_calibrated_mjcf,
 )
-from capx.integrations.tron2.perception_service import request_pose
+from capx.integrations.tron2.perception import cube_color_mask
 from capx.integrations.tron2.target_motion import red_target_mask
-
-WORKSPACE_Z_SHIFT = round(VENDOR_BASE_Z - EXPERIMENT_BASE_Z, 3)
 
 
 def sha256(data):
@@ -47,7 +43,7 @@ def archived_rgb_replay(rgb, image, archived, expected_hash):
     max_delta = int(delta.max())
     same_masks = all(
         np.array_equal(classify(reference), classify(rgb))
-        for classify in (red_target_mask, perception.cube_color_mask)
+        for classify in (red_target_mask, cube_color_mask)
     )
     if changed_pixels > 16 or max_delta > 1 or not same_masks:
         raise RuntimeError(
@@ -64,15 +60,6 @@ def archived_rgb_replay(rgb, image, archived, expected_hash):
 
 class OcclusionEnv(evaluation.Tron2MujocoEnv):
     """Record the camera path for the existing S2 pose tool."""
-
-    def __init__(self, *, perception_url=None, **kwargs):
-        super().__init__(**kwargs)
-        self._perception_url = perception_url
-
-    def _estimate_pose(self, frame, name):
-        if self._perception_url:
-            return request_pose(self._perception_url, frame, name, WORKSPACE_Z_SHIFT)
-        return perception.estimate_tabletop_pose(frame, name, workspace_z_offset=WORKSPACE_Z_SHIFT)
 
     def get_object_pose(self, name):
         record = {"name": name, "cameras": [], "success": False}
@@ -106,7 +93,7 @@ def main():
         parser.error("Set TRON2_MJCF_PATH to the original DACH_TRON2A gripper XML")
     vendor_path = Path(vendor).resolve()
     metadata = {
-        "profile": "fixed_gap_head_occlusion_v1",
+        "profile": "fixed_gap_recessed_mount_head_occlusion_v2",
         "tabletop_world_z_m": TABLETOP_Z,
         "base_link_world_z_m": EXPERIMENT_BASE_Z,
         "base_to_table_gap_m": MOUNT_GAP,
@@ -122,17 +109,31 @@ def main():
             parser.error("The text baseline must use this mounting and occlusion experiment")
         baseline_rows = {row["seed"]: row for row in baseline["seed_results"]}
         evaluator_args.extend(["--baseline", str(options.baseline)])
+    if options.perception_url:
+        evaluator_args.extend(["--perception-url", options.perception_url])
+    if options.record_overview:
+        evaluator_args.append("--record-overview")
 
     active = None
     original_encode = evaluation.encode_rgb
     original_execute = evaluation.execute
     original_write = evaluation.write_report
-    recorded_overview = set()
 
     def make_backend(**kwargs):
         nonlocal active
         active = CalibratedRecoveryBackend(model_path=overlay_path, **kwargs)
         return active
+
+    def make_no_disturbance_backend(**kwargs):
+        backend = make_backend(**kwargs)
+        reset = backend.reset
+
+        def reset_without_shift(seed=None):
+            reset(seed)
+            backend._offset_xy = (0.0, 0.0)
+
+        backend.reset = reset_without_shift
+        return backend
 
     def execute(env, backend, generation):
         previous_calls = len(backend.pose_calls)
@@ -178,20 +179,16 @@ def main():
         row = report["seed_results"][-1]
         row["head_captures"] = list(active.captures)
         row["archived_rgb_replays"] = list(active.rgb_replays)
-        if options.record_overview and row["seed"] not in recorded_overview:
-            frame_dir = output.with_name(output.stem + "_frames")
-            frame = original_encode(active.get_image("overview"))
-            (frame_dir / f"{row['seed']:02d}_overview.png").write_bytes(frame)
-            recorded_overview.add(row["seed"])
         original_write(report, output)
 
     with (
         TemporaryDirectory(prefix="capx-tron2-occlusion-") as directory,
         patch.object(evaluation, "RecoveryMujocoBackend", make_backend),
+        patch.object(evaluation, "NoDisturbanceRecoveryBackend", make_no_disturbance_backend),
         patch.object(
             evaluation,
             "Tron2MujocoEnv",
-            lambda **kwargs: OcclusionEnv(perception_url=options.perception_url, **kwargs),
+            OcclusionEnv,
         ),
         patch.object(evaluation, "execute", execute),
         patch.object(evaluation, "encode_rgb", encode),

@@ -10,6 +10,8 @@ env:
       privileged: false
       enable_render: true
       visual_pose: true
+      perception_url: http://127.0.0.1:8121
+      perception_timeout_s: 5.0
     apis: [Tron2ControlApi]
     multi_turn_prompt: |
       Executed code:
@@ -26,3 +28,7 @@ save_multiturn_prompts: true
 output_dir: ./outputs/tron2/cube_lift_s2
 trials: 20
 num_workers: 1
+api_servers:
+  - _target_: capx.serving.launch_tron2_rgbd_server.main
+    host: 127.0.0.1
+    port: 8121

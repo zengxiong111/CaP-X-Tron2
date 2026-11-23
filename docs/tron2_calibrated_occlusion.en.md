@@ -2,6 +2,8 @@
 
 This evaluation compares text feedback with text plus target-motion VDM at tabletop world Z = 0.620 m and a 0.450 m gap from the tabletop to the simulated `base_Link`. Results were recorded on 2026-11-23.
 
+These results use the previous mounting overlay. To reproduce the historical numbers, use commit `62c243a` in a separate worktree. The same evaluation entry point now uses the recessed mount and the revised right gripper orientation. [Current paired benchmark](tron2_benchmark.en.md)
+
 [简体中文](tron2_calibrated_occlusion.md) · [Simulation environment and official assets](tron2_bringup.en.md#setup)
 
 ## Contents

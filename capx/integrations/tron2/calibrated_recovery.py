@@ -6,24 +6,8 @@ from xml.etree import ElementTree as ET
 import numpy as np
 
 from .recovery_backend import RecoveryMujocoBackend
+from .mounting import BASE_WORLD_Z as EXPERIMENT_BASE_Z, MOUNT_GAP, RIGHT_READY as READY, TABLETOP_Z
 
-TABLETOP_Z = 0.620
-MOUNT_GAP = 0.450
-VENDOR_BASE_Z = 1.210
-EXPERIMENT_BASE_Z = TABLETOP_Z + MOUNT_GAP
-
-# Right-arm ready branch verified on the fixed-gap scene at [0.43, -0.22, -0.32] m.
-READY = np.array(
-    (
-        1.50289852223072,
-        -2.4200518054276943,
-        -0.9494541628289997,
-        -1.4767557271848775,
-        -0.5400267590736921,
-        0.6963559623185722,
-        0.883901176474163,
-    )
-)
 # Rounded rectangles in 480 × 360 head-camera pixels, selected on seeds 21–24.
 HEAD_PATCHES = ((313, 215, 28, 31), (318, 171, 38, 24), (375, 220, 24, 29))
 PATCH_COLOR = (48, 51, 54)
@@ -38,8 +22,8 @@ def write_calibrated_mjcf(vendor_path: Path, output: Path) -> None:
     if compiler is None or base is None:
         raise ValueError("Expected the official DACH_TRON2A gripper XML")
     x, y, z = map(float, base.attrib["pos"].split())
-    if not np.isclose(z, VENDOR_BASE_Z, atol=1e-9, rtol=0):
-        raise ValueError("Expected the original base_Link at world Z = 1.210 m")
+    if not (np.isclose(z, 1.210, atol=1e-9, rtol=0) or np.isclose(z, EXPERIMENT_BASE_Z, atol=1e-9, rtol=0)):
+        raise ValueError("Expected the vendor base at 1.210 m or calibrated base at 1.070 m")
     compiler.set("meshdir", str((vendor_path.parent / compiler.get("meshdir", ".")).resolve()))
     base.set("pos", f"{x:g} {y:g} {EXPERIMENT_BASE_Z:.12g}")
     tree.write(output, encoding="unicode")
@@ -85,11 +69,10 @@ class CalibratedRecoveryBackend(RecoveryMujocoBackend):
 
     def reset(self, seed=None) -> None:
         super().reset(seed)
-        self._data.qpos[self._ready_qpos] = READY
-        self._data.qvel[self._ready_dofs] = 0
-        self._targets[self._right_actuators] = READY
-        self._mj.mj_forward(self._model, self._data)
-        self.advance(0.3)
+        # MujocoBackend.reset already uses this branch; keep the wrapper from
+        # teleporting or advancing the same ready motion a second time.
+        if not np.allclose(self._data.qpos[self._ready_qpos], READY, atol=1e-4, rtol=0):
+            raise RuntimeError("The fixed-gap backend did not reset to the calibrated ready branch")
         if contact := self._unexpected_contact(self._data):
             raise RuntimeError(f"Contact at calibrated reset: {contact}")
         self.trace_seed = seed

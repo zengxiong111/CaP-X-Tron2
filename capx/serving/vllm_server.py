@@ -17,6 +17,7 @@ class Args:
     host: str = "0.0.0.0"
     port: int = 8000
     dtype: str = "bfloat16"
+    revision: str | None = None
     tensor_parallel_size: int = 1
     gpu_memory_utilization: float = 0.9
     max_model_len: int | None = None
@@ -44,6 +45,8 @@ def _build_command(args: Args) -> list[str]:
     ]
     if args.max_model_len is not None:
         cmd.extend(["--max-model-len", str(args.max_model_len)])
+    if args.revision is not None:
+        cmd.extend(["--revision", args.revision])
     if args.download_dir:
         cmd.extend(["--download-dir", args.download_dir])
     return cmd
