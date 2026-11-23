@@ -40,4 +40,4 @@ S1 读取真值位姿。S2 用头部或外部相机估计已知颜色与尺寸�
 | Cube Lift | 持续夹持，方块中心升高至少 7 cm。 |
 | Pick & Place | 曾夹持且已释放。方块距目标的水平误差至多 3.5 cm，垂直误差至多 1.2 cm。 |
 
-两项任务均要求至少 0.25 秒稳定窗口。`TRON2 feedback` 将动作结果和当前状态提供给后续回合，重试沿用当前场景。已验证真实模型在真值位姿配置下的 Cube Lift，以及保存代码的 MuJoCo 回放。 [评测结果](tron2_bringup.md#results) · [真机接入路线](tron2_hardware.md)
+两项任务均要求至少 0.25 秒稳定窗口。`TRON2 feedback` 将动作结果和当前状态提供给后续回合，重试沿用当前场景。Cube Lift 已验证真实模型在真值和 RGB-D 条件下的空抓恢复，也支持回放已保存的模型代码。 [恢复评测](tron2_recovery.md) · [真机接入路线](tron2_hardware.md)

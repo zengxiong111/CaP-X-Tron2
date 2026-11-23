@@ -40,4 +40,4 @@ S1 reads ground-truth poses. S2 estimates object centers from the head or overvi
 | Cube Lift | Maintain a grasp while raising the cube center by at least 7 cm. |
 | Pick & Place | Grasp and release the cube. Its horizontal error from the target must be at most 3.5 cm and its vertical error at most 1.2 cm. |
 
-Both tasks require a stable window of at least 0.25 seconds. `TRON2 feedback` passes action results and current state to later turns, and retries continue in the same scene. Validation covers live-model Cube Lift with ground-truth poses and MuJoCo replay of the saved program. [Evaluation results](tron2_bringup.en.md#results) · [Hardware integration guide in Chinese](tron2_hardware.md)
+Both tasks require a stable window of at least 0.25 seconds. `TRON2 feedback` passes action results and current state to later turns, and retries continue in the same scene. Cube Lift has validated live-model recovery after empty grasps with both ground-truth and RGB-D poses. It also supports replay of the saved model program. [Recovery evaluation](tron2_recovery.en.md) · [Hardware integration guide in Chinese](tron2_hardware.md)

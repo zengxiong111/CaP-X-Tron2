@@ -73,10 +73,15 @@ class Tron2MujocoEnv(BaseEnv):
             raise ValueError("max_seconds must be positive and finite")
         if viser_debug:
             raise ValueError("TRON2 does not support viser_debug")
-        if visual_pose and (privileged or not enable_render or backend != "mujoco"):
-            raise ValueError(
-                "visual_pose requires backend='mujoco', privileged=False and enable_render=True"
-            )
+        if visual_pose:
+            from capx.integrations.tron2.mujoco_backend import MujocoBackend
+
+            if privileged or not enable_render or not (
+                backend == "mujoco" or isinstance(backend, MujocoBackend)
+            ):
+                raise ValueError(
+                    "visual_pose requires a MuJoCo backend, privileged=False and enable_render=True"
+                )
 
         self.task = task
         self.max_steps = max_steps

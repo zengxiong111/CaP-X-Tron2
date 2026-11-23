@@ -89,8 +89,8 @@ done
 | Cube Lift Oracle 重跑 | Mock、MuJoCo S1、MuJoCo S2 均为 20/20 |
 | 原始提示词 | 单轮和多轮均为 0/20，程序闭爪后缺少抬升指令，多轮每次均重写五次 |
 | 明确五步动作及脚本格式 | 单轮和多轮均为 20/20，全部首轮完成，方块中心升高 11.95–11.97 cm |
-| TRON2 回归 | 7 项通过 |
+| TRON2 回归 | 8 项通过，含 S2 注入 MuJoCo 后端的检查 |
 
 Cube Lift 判分要求方块保持夹持，中心升高至少 7 cm，并在 0.25 秒稳定窗口内保持速度不高于 0.04 m/s。验收使用源码 `ce2e708228badee5ba601ebcc03f6aaa069d33cf`、Linux、Python 3.12.3、MuJoCo 3.17.0 和桌面世界高度 0.620 m。发布的回放程序 SHA-256 为 `2d7ad6a562b64e03d9179b0980c122044cdf6b783bf6a70f842553ca47531881`。
 
-仓库此前记录的 Pick & Place Oracle 在同三种配置上均为 20/20。本次真实模型数据覆盖 **Cube Lift 真值位姿**。图形回放展示保存的程序，逐回合连续录像仍待接入。
+仓库此前记录的 Pick & Place Oracle 在同三种配置上均为 20/20。真实模型验证覆盖 Cube Lift 的真值位姿和 RGB-D 恢复。图形回放执行保存的程序。 [扰动与 VDM 评测](tron2_recovery.md)

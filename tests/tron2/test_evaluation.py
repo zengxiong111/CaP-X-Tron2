@@ -127,3 +127,26 @@ def test_mujoco_s2_estimates_pose_and_solves_task(tmp_path):
     finally:
         env.close()
         privileged.close()
+
+
+@pytest.mark.skipif(
+    not (os.getenv("TRON2_MJCF_PATH") and os.getenv("TRON2_TEST_RENDER") == "1"),
+    reason="requires the DACH_TRON2A model and a MuJoCo rendering context",
+)
+def test_mujoco_s2_accepts_an_injected_rendering_backend():
+    pytest.importorskip("mujoco")
+    from math import dist
+
+    from capx.integrations.tron2.mujoco_backend import MujocoBackend
+
+    class CustomMujocoBackend(MujocoBackend):
+        pass
+
+    backend = CustomMujocoBackend(enable_render=True)
+    env = Tron2MujocoEnv(backend=backend, enable_render=True, visual_pose=True)
+    try:
+        observation, _ = env.reset(seed=1)
+        assert "object_poses" not in observation
+        assert dist(env.get_object_pose("cube")[:3], backend.get_object_pose("cube")[:3]) < 0.005
+    finally:
+        env.close()

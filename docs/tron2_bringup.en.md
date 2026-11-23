@@ -87,8 +87,8 @@ All four configurations use seeds 1–20 and simulation ground-truth poses. For 
 | Cube Lift Oracle rerun | Mock, MuJoCo S1, and MuJoCo S2 each achieved 20/20 |
 | Original prompt | Both turn settings achieved 0/20. The program omitted the lift after closing the gripper, and each multi-turn trial used five regenerations. |
 | Explicit five-action sequence and script format | Both turn settings achieved 20/20 on the first turn. The cube center rose by 11.95–11.97 cm. |
-| TRON2 regressions | 7 passed |
+| TRON2 regressions | 8 passed, including S2 with an injected MuJoCo backend |
 
 Cube Lift requires a held cube to rise at least 7 cm and stay at or below 0.04 m/s during a 0.25-second stability window. Validation used source `ce2e708228badee5ba601ebcc03f6aaa069d33cf`, Linux, Python 3.12.3, MuJoCo 3.17.0, and tabletop world Z of 0.620 m. The published replay program has SHA-256 `2d7ad6a562b64e03d9179b0980c122044cdf6b783bf6a70f842553ca47531881`.
 
-The repository previously recorded Pick & Place Oracle results of 20/20 under all three configurations. The live model data cover **Cube Lift with ground-truth poses**. The viewer replays the saved program. Continuous per-turn recording remains future work.
+The repository previously recorded Pick & Place Oracle results of 20/20 under all three configurations. Live model validation covers Cube Lift with ground-truth poses and RGB-D recovery. The viewer executes the saved program. [Perturbation and VDM evaluation](tron2_recovery.en.md)
